@@ -26,7 +26,7 @@ nep-kommentatorkit/
 > Forutsetter at Companion Satellite allerede er installert.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/medic02/nep-kommentatorkit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash
 ```
 
 Følg instruksjonene – du velger Pi-nummer og logger inn på Tailscale.
@@ -53,7 +53,7 @@ Følg instruksjonene – du velger Pi-nummer og logger inn på Tailscale.
 ## Oppdatere eksisterende Pi
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/medic02/nep-kommentatorkit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash
 ```
 
 Scriptet er idempotent – trygt å kjøre på nytt.

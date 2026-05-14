@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # NEP Kommentatorkit – Satellite Pi installer
-# Bruk: curl -fsSL https://raw.githubusercontent.com/medic02/nep-kommentatorkit/main/install.sh | bash
+# Bruk: curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash
 
 set -euo pipefail
 
-GITHUB_RAW="https://raw.githubusercontent.com/medic02/nep-kommentatorkit/main"
+GITHUB_RAW="https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main"
 
 echo ""
 echo "================================="
