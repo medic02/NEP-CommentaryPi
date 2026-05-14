@@ -11,6 +11,13 @@ LOGTAG="${LOGTAG:-nep-ts-failover}"
 FAILOVER_FLAG="/home/pi/.nep-ts-failover-disabled"
 SATELLITE_CONFIG="/home/satellite/satellite-config.json"
 
+FAIL_THRESHOLD="${FAIL_THRESHOLD:-4}"
+LAN_OK_BEFORE_RESET="${LAN_OK_BEFORE_RESET:-3}"
+SETTLE_SECONDS="${SETTLE_SECONDS:-15}"
+
+STATE_DIR="/run/nep-ts-failover"
+mkdir -p "$STATE_DIR"
+
 # Les Companion IP fra satellite sin config hvis tilgjengelig
 if [ -f "$SATELLITE_CONFIG" ]; then
     _ip="$(python3 -c "import json; d=json.load(open('$SATELLITE_CONFIG')); print(d.get('remoteIp',''))" 2>/dev/null || true)"
@@ -26,13 +33,6 @@ if [ -f "$FAILOVER_FLAG" ]; then
     logger -t "$LOGTAG" "Failover deaktivert – hopper over"
     exit 0
 fi
-
-FAIL_THRESHOLD="${FAIL_THRESHOLD:-4}"
-LAN_OK_BEFORE_RESET="${LAN_OK_BEFORE_RESET:-3}"
-SETTLE_SECONDS="${SETTLE_SECONDS:-15}"
-
-STATE_DIR="/run/nep-ts-failover"
-mkdir -p "$STATE_DIR"
 
 FAIL_FILE="$STATE_DIR/fail.count"
 LANOK_FILE="$STATE_DIR/lanok.count"
