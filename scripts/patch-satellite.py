@@ -15,7 +15,7 @@ try:
     if not os.path.exists(ORIGINAL):
         with open(TARGET, 'r') as f:
             peek = f.read(16384)
-        already_patched = f'_sx={SRC_X}' in peek or f'_lsx={SRC_X}' in peek
+        already_patched = f'_sx={SRC_X}' in peek or '_lmargin=' in peek
         bak = TARGET + '.nep-bak'
         if already_patched and os.path.exists(bak):
             shutil.copy2(bak, ORIGINAL)
@@ -100,11 +100,16 @@ OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.
       iconTargetSize
     );'''
 
-NEW_LOGO = f'''    const _lsx={SRC_X},_lsy={SRC_Y},_lsw={SRC_W},_lsh={SRC_H};
-    const _lsc=Math.min((width-6)/_lsw,(height-6)/_lsh);
-    const _ldw=Math.max(1,Math.floor(_lsw*_lsc)),_ldh=Math.max(1,Math.floor(_lsh*_lsc));
-    const _ldy=Math.min(Math.floor((height-_ldh)/2)+8, height-_ldh);
-    context2d.drawImage(iconImage,_lsx,_lsy,_lsw,_lsh,Math.floor((width-_ldw)/2),_ldy,_ldw,_ldh);'''
+LOGO_SHIFT_DOWN = 10  # positive = down from center, negative = up
+
+NEW_LOGO = f'''    const _lmargin=8;
+    const _lavailW=Math.max(1,width-_lmargin*2),_lavailH=Math.max(1,height-_lmargin*2);
+    const _lsc=Math.min(_lavailW/iconImage.width,_lavailH/iconImage.height);
+    const _ldw=Math.max(1,Math.floor(iconImage.width*_lsc)),_ldh=Math.max(1,Math.floor(iconImage.height*_lsc));
+    const _ldx=Math.floor((width-_ldw)/2);
+    let _ldy=Math.floor((height-_ldh)/2)+{LOGO_SHIFT_DOWN};
+    _ldy=Math.max(0,Math.min(_ldy,height-_ldh));
+    context2d.drawImage(iconImage,0,0,iconImage.width,iconImage.height,_ldx,_ldy,_ldw,_ldh);'''
 
 changed = False
 
@@ -121,7 +126,7 @@ if OLD_LOGO in src:
     src = src.replace(OLD_LOGO, NEW_LOGO)
     print('  generateLogoCard: patchet')
     changed = True
-elif f'_lsx={SRC_X}' in src:
+elif '_lmargin=' in src:
     print('  generateLogoCard: allerede patchet')
 else:
     print('  ADVARSEL: generateLogoCard ikke funnet')
