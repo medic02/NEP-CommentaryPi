@@ -1,0 +1,20 @@
+[Unit]
+Description=NEP Health API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/health
+Environment=NEP_ID=Satellite Pi
+Environment=COMPANION_IP=192.168.8.101
+Environment=COMPANION_PORT=8000
+Environment=LAN_DEV=eth0
+Environment=TS_DEV=tailscale0
+ExecStart=/home/pi/health/venv/bin/python /home/pi/health/health.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

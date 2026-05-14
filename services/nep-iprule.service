@@ -1,0 +1,13 @@
+[Unit]
+Description=NEP LAN priority routing rule
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'ip rule add to 192.168.8.0/24 lookup main priority 50 2>/dev/null || true'
+ExecStartPost=/bin/bash -c 'ip route flush cache || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=NEP LAN->Tailscale failover
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=COMPANION_LAN_IP=192.168.8.101
+Environment=COMPANION_PORT=8000
+Environment=LAN_DEV=eth0
+Environment=TS_DEV=tailscale0
+ExecStart=/usr/local/sbin/nep-ts-failover.sh
