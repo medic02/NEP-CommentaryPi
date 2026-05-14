@@ -28,56 +28,30 @@ export class CardGenerator {
 
     const conn = getConnType(remoteIp);
 
-    const fontSize = 10;
-    context2d.font = `normal normal normal ${fontSize}px sans-serif`;
-    context2d.textAlign = 'left';
-    context2d.fillStyle = '#ffffff';
-
-    const line1 = `Status: ${status}`;
-    const line2 = `Local: ${getIPAddress()}`;
-    const line3 = `Remote: ${remoteIp}`;
-    const line4 = `Conn: ${conn}`;
-
-    const padX = 8;
-    const topY = 12;
-    const lineGap = 12;
-
-    context2d.fillText(line1, padX, topY + lineGap * 0);
-    context2d.fillText(line2, padX, topY + lineGap * 1);
-    context2d.fillText(line3, padX, topY + lineGap * 2);
-    context2d.fillText(line4, padX, topY + lineGap * 3);
-
-    const textH = topY + lineGap * 4 + 2;
-
-    const areaShiftUp = 30;
-    const drawShiftUp = 20;
-    const logoPaddingTop = 2;
-    const logoPaddingBottom = 4;
-
-    const logoX = 0;
-    const logoY = (textH + logoPaddingTop) - areaShiftUp;
-    const logoW = width;
-    const logoH = height - textH - logoPaddingTop - logoPaddingBottom + areaShiftUp;
-
-    const safeLogoY = Math.max(0, Math.min(logoY, height - 1));
-    const safeLogoH = Math.max(1, Math.min(logoH, height - safeLogoY));
-
-    const margin = 4;
-    const availW = Math.max(1, logoW - margin * 2);
-    const availH = Math.max(1, safeLogoH - margin * 2);
-
-    const scale = Math.min(availW / iconImage.width, availH / iconImage.height);
+    // Logo fills top 78% of button, scaled by width
+    const logoAreaH = Math.floor(height * 0.78);
+    const margin = 3;
+    const scaleW = (width - margin * 2) / iconImage.width;
+    const scaleH = (logoAreaH - margin) / iconImage.height;
+    const scale = Math.min(scaleW, scaleH);
     const drawW = Math.max(1, Math.floor(iconImage.width * scale));
     const drawH = Math.max(1, Math.floor(iconImage.height * scale));
-
-    const drawX = Math.floor(logoX + (logoW - drawW) / 2);
-
-    let drawY = Math.floor(safeLogoY + (safeLogoH - drawH) / 2) - drawShiftUp;
-    const minY = safeLogoY;
-    const maxY = safeLogoY + safeLogoH - drawH;
-    drawY = Math.max(minY, Math.min(drawY, maxY));
-
+    const drawX = Math.floor((width - drawW) / 2);
+    const drawY = Math.floor((logoAreaH - drawH) / 2);
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
+
+    // Status line
+    const isConnected = status === 'Connected';
+    context2d.textAlign = 'center';
+    context2d.fillStyle = isConnected ? '#00cc44' : '#ff8800';
+    context2d.font = `bold 11px sans-serif`;
+    context2d.fillText(status, width / 2, logoAreaH + 13);
+
+    // Conn type line
+    context2d.fillStyle = '#aaaaaa';
+    context2d.font = `9px sans-serif`;
+    const connLabel = conn === 'LAN' ? 'LAN' : conn === 'TS' ? 'Tailscale' : '–';
+    context2d.fillText(connLabel, width / 2, logoAreaH + 24);
 
     const rawImage = Buffer.from(context2d.getImageData(0, 0, canvasWidth, canvasHeight).data);
     const computedImage = await imageRs.ImageTransformer.fromBuffer(rawImage, canvasWidth, canvasHeight, 'rgba')
@@ -126,12 +100,8 @@ export class CardGenerator {
     const scale = Math.min(availW / iconImage.width, availH / iconImage.height);
     const drawW = Math.max(1, Math.floor(iconImage.width * scale));
     const drawH = Math.max(1, Math.floor(iconImage.height * scale));
-
     const drawX = Math.floor(areaX + (areaW - drawW) / 2);
-
-    const drawShiftUp = 8;
-    let drawY = Math.floor(areaY + (areaH - drawH) / 2) - drawShiftUp;
-    drawY = Math.max(areaY, Math.min(drawY, areaY + areaH - drawH));
+    const drawY = Math.floor(areaY + (areaH - drawH) / 2);
 
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
@@ -148,19 +118,12 @@ export class CardGenerator {
     const canvas = new Canvas(width, height);
     const context2d = canvas.getContext('2d');
 
-    const margin = 8;
-    const availW = Math.max(1, width - margin * 2);
-    const availH = Math.max(1, height - margin * 2);
-
-    const scale = Math.min(availW / iconImage.width, availH / iconImage.height);
+    const margin = 4;
+    const scale = Math.min((width - margin * 2) / iconImage.width, (height - margin * 2) / iconImage.height);
     const drawW = Math.max(1, Math.floor(iconImage.width * scale));
     const drawH = Math.max(1, Math.floor(iconImage.height * scale));
-
     const drawX = Math.floor((width - drawW) / 2);
-
-    const shiftUp = 14;
-    let drawY = Math.floor((height - drawH) / 2) - shiftUp;
-    drawY = Math.max(0, Math.min(drawY, height - drawH));
+    const drawY = Math.floor((height - drawH) / 2);
 
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
