@@ -181,11 +181,11 @@ else
 fi
 sudo tailscale set --accept-routes=true --accept-dns=false 2>/dev/null || true
 
-# ── [6/7] NEP logo + cards.js ────────────────────────────────────────────────
-echo "[6/7] Installerer NEP logo og cards.js..."
+# ── [6/7] NEP logo + splash-patch ────────────────────────────────────────────
+echo "[6/7] Installerer NEP logo og patcher splash-skjerm..."
 
 ASSETS_DIR="/opt/companion-satellite/satellite/dist/assets"
-CARDS_FILE="/opt/companion-satellite/satellite/dist/graphics/cards.js"
+ENTRYPOINT="/opt/companion-satellite/satellite/dist/surface-entrypoint.mjs"
 
 if [ -d "$ASSETS_DIR" ]; then
     if sudo curl -fsSL "$GITHUB_RAW/assets/nep-logo.png" -o "$ASSETS_DIR/icon.png" 2>/dev/null; then
@@ -194,15 +194,19 @@ if [ -d "$ASSETS_DIR" ]; then
         echo "  ADVARSEL: nep-logo.png ikke funnet i repo – hopper over logo."
     fi
 else
-    echo "  ADVARSEL: $ASSETS_DIR ikke funnet – hopper over logo."
+    sudo mkdir -p "$ASSETS_DIR"
+    if sudo curl -fsSL "$GITHUB_RAW/assets/nep-logo.png" -o "$ASSETS_DIR/icon.png" 2>/dev/null; then
+        echo "  Logo installert (ny mappe opprettet)."
+    else
+        echo "  ADVARSEL: nep-logo.png ikke funnet i repo – hopper over logo."
+    fi
 fi
 
-if [ -f "$CARDS_FILE" ]; then
-    sudo cp -a "$CARDS_FILE" "${CARDS_FILE}.bak.$(date +%s)" 2>/dev/null || true
-    sudo curl -fsSL "$GITHUB_RAW/scripts/cards.js" -o "$CARDS_FILE"
-    echo "  cards.js installert."
+if [ -f "$ENTRYPOINT" ]; then
+    curl -fsSL "$GITHUB_RAW/scripts/patch-satellite.py" -o /tmp/patch-satellite.py
+    sudo python3 /tmp/patch-satellite.py
 else
-    echo "  ADVARSEL: $CARDS_FILE ikke funnet – hopper over cards.js."
+    echo "  ADVARSEL: $ENTRYPOINT ikke funnet – hopper over splash-patch."
 fi
 
 sudo systemctl restart satellite 2>/dev/null || true
