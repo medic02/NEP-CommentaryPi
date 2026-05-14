@@ -7,6 +7,9 @@ TARGET = '/opt/companion-satellite/satellite/dist/surface-entrypoint.mjs'
 
 ORIGINAL = TARGET + '.nep-original'
 
+# Crop coordinates: content area of 2000x1126 logo (wheel + 40 mark)
+SRC_X, SRC_Y, SRC_W, SRC_H = 60, 80, 1700, 980
+
 try:
     import os
     if not os.path.exists(ORIGINAL):
@@ -44,9 +47,6 @@ except Exception:
     pass
 
 print(f'  Pi-ID: {nep_id}')
-
-# Crop coordinates: content area of 2000x1126 logo (wheel + 40 mark)
-SRC_X, SRC_Y, SRC_W, SRC_H = 60, 80, 1700, 980
 
 OLD_BASIC = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.6);
     const iconTargetX = (width - iconTargetSize) / 2;
