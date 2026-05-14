@@ -131,12 +131,14 @@ export class CardGenerator {
     const canvas = new Canvas(width, height);
     const context2d = canvas.getContext('2d');
 
-    const margin = 4;
+    const margin = 8;
     const scale = Math.min((width - margin * 2) / iconImage.width, (height - margin * 2) / iconImage.height);
     const drawW = Math.max(1, Math.floor(iconImage.width * scale));
     const drawH = Math.max(1, Math.floor(iconImage.height * scale));
     const drawX = Math.floor((width - drawW) / 2);
-    const drawY = Math.floor((height - drawH) / 2);
+    const shiftDown = 14;
+    let drawY = Math.floor((height - drawH) / 2) + shiftDown;
+    drawY = Math.max(0, Math.min(drawY, height - drawH));
 
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
