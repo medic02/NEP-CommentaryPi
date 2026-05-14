@@ -19,6 +19,7 @@ FAIL_FILE="$STATE_DIR/fail.count"
 LANOK_FILE="$STATE_DIR/lanok.count"
 LAST_SIG_FILE="$STATE_DIR/last.sig"
 LOCK_FILE="$STATE_DIR/lock"
+RESTART_PENDING_FILE="$STATE_DIR/restart_pending"
 
 touch "$FAIL_FILE" "$LANOK_FILE" "$LAST_SIG_FILE"
 
@@ -72,6 +73,28 @@ restart_satellite() {
     ip route flush cache 2>/dev/null || true
 }
 
+schedule_satellite_restart() {
+    echo "$(date +%s)" > "$RESTART_PENDING_FILE"
+    logger -t "$LOGTAG" "Satellite restart scheduled in ${SETTLE_SECONDS}s"
+}
+
+check_pending_satellite_restart() {
+    [ -f "$RESTART_PENDING_FILE" ] || return 0
+    local ts now elapsed
+    ts="$(cat "$RESTART_PENDING_FILE" 2>/dev/null || echo 0)"
+    now="$(date +%s)"
+    elapsed=$((now - ts))
+    if [ "$elapsed" -ge "$SETTLE_SECONDS" ]; then
+        rm -f "$RESTART_PENDING_FILE"
+        logger -t "$LOGTAG" "Restarting satellite (${elapsed}s after network switch)"
+        systemctl kill -s KILL satellite 2>/dev/null || true
+        sleep 2
+        systemctl start satellite 2>/dev/null || true
+    fi
+}
+
+check_pending_satellite_restart
+
 # Nettverksendring: vent og reset tellere
 if network_changed; then
     logger -t "$LOGTAG" "Network change detected – settling ${SETTLE_SECONDS}s"
@@ -95,6 +118,7 @@ if route_is_forced; then
             clear_ts_route
             echo "0" > "$LANOK_FILE"
             restart_satellite
+            schedule_satellite_restart
         fi
     else
         echo "0" > "$LANOK_FILE"
@@ -119,5 +143,6 @@ else
         force_ts_route
         echo "0" > "$FAIL_FILE"
         restart_satellite
+        schedule_satellite_restart
     fi
 fi
