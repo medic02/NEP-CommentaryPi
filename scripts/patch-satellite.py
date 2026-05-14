@@ -84,7 +84,7 @@ OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.
 NEW_LOGO = f'''    const _lsx={SRC_X},_lsy={SRC_Y},_lsw={SRC_W},_lsh={SRC_H};
     const _lsc=Math.min((width-6)/_lsw,(height-6)/_lsh);
     const _ldw=Math.max(1,Math.floor(_lsw*_lsc)),_ldh=Math.max(1,Math.floor(_lsh*_lsc));
-    const _ldy=Math.min(Math.floor((height-_ldh)/2)+32, height-_ldh);
+    const _ldy=Math.min(Math.floor((height-_ldh)/2)+132, height-_ldh);
     context2d.drawImage(iconImage,_lsx,_lsy,_lsw,_lsh,Math.floor((width-_ldw)/2),_ldy,_ldw,_ldh);'''
 
 changed = False
