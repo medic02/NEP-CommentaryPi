@@ -8,6 +8,21 @@ LAN_DEV="${LAN_DEV:-eth0}"
 TS_DEV="${TS_DEV:-tailscale0}"
 LOGTAG="${LOGTAG:-nep-ts-failover}"
 
+FAILOVER_FLAG="/home/pi/.nep-ts-failover-disabled"
+SATELLITE_CONFIG="/home/satellite/satellite-config.json"
+
+# Les Companion IP fra satellite sin config hvis tilgjengelig
+if [ -f "$SATELLITE_CONFIG" ]; then
+    _ip="$(python3 -c "import json; d=json.load(open('$SATELLITE_CONFIG')); print(d.get('remoteIp',''))" 2>/dev/null || true)"
+    [ -n "$_ip" ] && COMPANION_LAN_IP="$_ip"
+fi
+
+# Hopp over hvis failover er deaktivert via webgui
+if [ -f "$FAILOVER_FLAG" ]; then
+    logger -t "$LOGTAG" "Failover deaktivert – hopper over"
+    exit 0
+fi
+
 FAIL_THRESHOLD="${FAIL_THRESHOLD:-4}"
 LAN_OK_BEFORE_RESET="${LAN_OK_BEFORE_RESET:-3}"
 SETTLE_SECONDS="${SETTLE_SECONDS:-15}"

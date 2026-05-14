@@ -2,7 +2,7 @@
 # NEP Kommentatorkit – Health API
 # Kjører på port 8080, eksponerer /health
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, Response
 import socket, time, subprocess, os
 import psutil
 
@@ -11,6 +11,8 @@ COMPANION_IP  = os.environ.get("COMPANION_IP", "192.168.8.101")
 COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 LAN_DEV       = os.environ.get("LAN_DEV", "eth0")
 TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
+
+FAILOVER_FLAG = "/home/pi/.nep-ts-failover-disabled"
 
 app = Flask(__name__)
 START_TIME = int(time.time())
@@ -98,6 +100,52 @@ def health():
         "failover":   failover_state(),
         "ts":         int(time.time())
     })
+
+@app.route("/failover", methods=["GET", "POST"])
+def failover_toggle():
+    disabled = os.path.exists(FAILOVER_FLAG)
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if action == "disable":
+            open(FAILOVER_FLAG, "w").close()
+            disabled = True
+        elif action == "enable":
+            try:
+                os.remove(FAILOVER_FLAG)
+            except FileNotFoundError:
+                pass
+            disabled = False
+
+    status = "DEAKTIVERT" if disabled else "AKTIV"
+    color  = "#ff4444" if disabled else "#00cc44"
+    btn_action = "enable" if disabled else "disable"
+    btn_label  = "Aktiver failover" if disabled else "Deaktiver failover"
+    btn_color  = "#00cc44" if disabled else "#ff4444"
+
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEP Failover – {APP_ID}</title>
+<style>
+body{{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;
+     display:flex;flex-direction:column;align-items:center;padding:40px 20px}}
+h1{{margin-bottom:4px}}
+.sub{{color:#888;margin-bottom:32px}}
+.status{{font-size:2em;font-weight:bold;color:{color};margin-bottom:32px}}
+form button{{padding:14px 32px;font-size:1.1em;border:none;border-radius:8px;
+             background:{btn_color};color:#fff;cursor:pointer}}
+</style></head>
+<body>
+<h1>Tailscale Failover</h1>
+<div class="sub">{APP_ID} · Companion {COMPANION_IP}</div>
+<div class="status">{status}</div>
+<form method="POST">
+  <input type="hidden" name="action" value="{btn_action}">
+  <button type="submit">{btn_label}</button>
+</form>
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
