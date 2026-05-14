@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { Canvas, loadImage } from '@napi-rs/canvas';
 import * as imageRs from '@julusian/image-rs';
 import { networkInterfaces } from 'os';
@@ -132,7 +133,10 @@ export class CardGenerator {
     const context2d = canvas.getContext('2d');
 
     const companionIp = await getCompanionIp();
-    const textH = 14;
+    const conn = getConnType(companionIp);
+    const fo = getFailoverStatus();
+
+    const textH = 24;
     const margin = 8;
     const availH = height - margin * 2 - textH;
     const scale = Math.min((width - margin * 2) / iconImage.width, availH / iconImage.height);
@@ -145,9 +149,13 @@ export class CardGenerator {
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
     context2d.font = '9px sans-serif';
-    context2d.fillStyle = '#888888';
     context2d.textAlign = 'center';
-    context2d.fillText(companionIp, width / 2, height - 4);
+
+    context2d.fillStyle = '#888888';
+    context2d.fillText(`${conn} · FO:${fo}`, width / 2, height - 13);
+
+    context2d.fillStyle = '#aaaaaa';
+    context2d.fillText(companionIp, width / 2, height - 3);
 
     return Buffer.from(context2d.getImageData(0, 0, width, height).data);
   }
@@ -155,9 +163,21 @@ export class CardGenerator {
 
 async function getCompanionIp() {
   try {
-    const { readFile } = await import('fs/promises');
+    const data = await readFile('/run/nep-ts-failover/companion_ip', 'utf8');
+    const ip = data.trim();
+    if (ip) return ip;
+  } catch {}
+  try {
     const data = await readFile('/home/satellite/satellite-config.json', 'utf8');
     return JSON.parse(data).remoteIp || '?';
+  } catch {
+    return '?';
+  }
+}
+
+function getFailoverStatus() {
+  try {
+    return existsSync('/home/pi/.nep-ts-failover-disabled') ? 'AV' : 'AKT';
   } catch {
     return '?';
   }

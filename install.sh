@@ -209,7 +209,18 @@ else
     echo "  ADVARSEL: $ENTRYPOINT ikke funnet – hopper over splash-patch."
 fi
 
-sudo systemctl restart satellite 2>/dev/null || true
+CARDS_JS="$(find /opt/companion-satellite -name "cards.js" -path "*/graphics/cards.js" 2>/dev/null | head -1)"
+if [ -n "$CARDS_JS" ]; then
+    curl -fsSL "$GITHUB_RAW/scripts/cards.js" -o /tmp/nep-cards.js
+    sudo cp /tmp/nep-cards.js "$CARDS_JS"
+    echo "  cards.js installert: $CARDS_JS"
+else
+    echo "  ADVARSEL: cards.js ikke funnet i satellite – hopper over."
+fi
+
+sudo systemctl kill -s KILL satellite 2>/dev/null || true
+sleep 2
+sudo systemctl start satellite 2>/dev/null || true
 
 # ── [7/7] Ferdig ─────────────────────────────────────────────────────────────
 echo ""
