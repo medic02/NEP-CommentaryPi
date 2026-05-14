@@ -14,7 +14,11 @@ SATELLITE_CONFIG="/home/satellite/satellite-config.json"
 # Les Companion IP fra satellite sin config hvis tilgjengelig
 if [ -f "$SATELLITE_CONFIG" ]; then
     _ip="$(python3 -c "import json; d=json.load(open('$SATELLITE_CONFIG')); print(d.get('remoteIp',''))" 2>/dev/null || true)"
-    [ -n "$_ip" ] && COMPANION_LAN_IP="$_ip"
+    if [ -n "$_ip" ]; then
+        COMPANION_LAN_IP="$_ip"
+        echo "$_ip" > "$STATE_DIR/companion_ip"
+        chmod 644 "$STATE_DIR/companion_ip"
+    fi
 fi
 
 # Hopp over hvis failover er deaktivert via webgui

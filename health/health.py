@@ -15,12 +15,12 @@ FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 
 def get_companion_ip():
+    # Prøv world-readable kopi skrevet av failover-script (root)
     try:
-        import json
-        with open(SATELLITE_CONFIG) as f:
-            return json.load(f).get("remoteIp", os.environ.get("COMPANION_IP", "192.168.8.101"))
+        return open("/run/nep-ts-failover/companion_ip").read().strip()
     except Exception:
-        return os.environ.get("COMPANION_IP", "192.168.8.101")
+        pass
+    return os.environ.get("COMPANION_IP", "192.168.8.101")
 
 app = Flask(__name__)
 START_TIME = int(time.time())
