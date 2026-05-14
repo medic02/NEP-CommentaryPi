@@ -101,11 +101,11 @@ Wants=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=$BASE
-Environment=NEP_ID=$NEP_ID
-Environment=COMPANION_IP=$COMPANION_IP
-Environment=COMPANION_PORT=$COMPANION_PORT
-Environment=LAN_DEV=$LAN_DEV
-Environment=TS_DEV=$TS_DEV
+Environment="NEP_ID=$NEP_ID"
+Environment="COMPANION_IP=$COMPANION_IP"
+Environment="COMPANION_PORT=$COMPANION_PORT"
+Environment="LAN_DEV=$LAN_DEV"
+Environment="TS_DEV=$TS_DEV"
 ExecStart=$BASE/venv/bin/python $BASE/health.py
 Restart=always
 RestartSec=2
