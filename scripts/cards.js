@@ -131,18 +131,35 @@ export class CardGenerator {
     const canvas = new Canvas(width, height);
     const context2d = canvas.getContext('2d');
 
+    const companionIp = await getCompanionIp();
+    const textH = 14;
     const margin = 8;
-    const scale = Math.min((width - margin * 2) / iconImage.width, (height - margin * 2) / iconImage.height);
+    const availH = height - margin * 2 - textH;
+    const scale = Math.min((width - margin * 2) / iconImage.width, availH / iconImage.height);
     const drawW = Math.max(1, Math.floor(iconImage.width * scale));
     const drawH = Math.max(1, Math.floor(iconImage.height * scale));
     const drawX = Math.floor((width - drawW) / 2);
-    const shiftDown = 14;
-    let drawY = Math.floor((height - drawH) / 2) + shiftDown;
-    drawY = Math.max(0, Math.min(drawY, height - drawH));
+    let drawY = Math.floor((height - textH - drawH) / 2);
+    drawY = Math.max(0, Math.min(drawY, height - textH - drawH));
 
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
+    context2d.font = '9px sans-serif';
+    context2d.fillStyle = '#888888';
+    context2d.textAlign = 'center';
+    context2d.fillText(companionIp, width / 2, height - 4);
+
     return Buffer.from(context2d.getImageData(0, 0, width, height).data);
+  }
+}
+
+async function getCompanionIp() {
+  try {
+    const { readFile } = await import('fs/promises');
+    const data = await readFile('/home/satellite/satellite-config.json', 'utf8');
+    return JSON.parse(data).remoteIp || '?';
+  } catch {
+    return '?';
   }
 }
 
