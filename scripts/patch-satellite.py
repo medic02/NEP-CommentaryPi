@@ -51,18 +51,19 @@ OLD_BASIC = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0
     context2d.fillText(`Status: ${status}`, 10, height - 50);'''
 
 NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H};
-    const _lh=Math.floor(height*0.58),_m=2;
-    const _sc=Math.min((width-_m*2)/_sw,(_lh-_m)/_sh);
+    const _lh=Math.floor(height*0.55),_m=10;
+    const _sc=Math.min((width-_m*2)/_sw,(_lh-4)/_sh);
     const _dw=Math.max(1,Math.floor(_sw*_sc)),_dh=Math.max(1,Math.floor(_sh*_sc));
     context2d.drawImage(iconImage,_sx,_sy,_sw,_sh,Math.floor((width-_dw)/2),Math.floor((_lh-_dh)/2),_dw,_dh);
     context2d.textAlign="left";
-    let _y=_lh+12;
-    context2d.font="bold 11px sans-serif";
+    let _y=_lh+13;
+    context2d.font="bold 12px sans-serif";
     context2d.fillStyle=status==="Connected"?"#00cc44":"#ff8800";
-    context2d.fillText(status,4,_y);_y+=12;
-    context2d.font="10px sans-serif";
+    context2d.fillText(status,4,_y);_y+=13;
+    context2d.font="11px sans-serif";
+    context2d.fillStyle="#dddddd";
+    context2d.fillText("IP: "+getIPAddress(),4,_y);_y+=12;
     context2d.fillStyle="#aaaaaa";
-    context2d.fillText("IP: "+getIPAddress(),4,_y);_y+=11;
     context2d.fillText("{nep_id}",4,_y);'''
 
 OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.8);
@@ -81,7 +82,7 @@ OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.
     );'''
 
 NEW_LOGO = f'''    const _lsx={SRC_X},_lsy={SRC_Y},_lsw={SRC_W},_lsh={SRC_H};
-    const _lsc=Math.min((width-4)/_lsw,(height-4)/_lsh);
+    const _lsc=Math.min((width-16)/_lsw,(height-16)/_lsh);
     const _ldw=Math.max(1,Math.floor(_lsw*_lsc)),_ldh=Math.max(1,Math.floor(_lsh*_lsc));
     context2d.drawImage(iconImage,_lsx,_lsy,_lsw,_lsh,Math.floor((width-_ldw)/2),Math.floor((height-_ldh)/2),_ldw,_ldh);'''
 
