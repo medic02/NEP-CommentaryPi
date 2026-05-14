@@ -184,7 +184,7 @@ sudo tailscale set --accept-routes=true --accept-dns=false 2>/dev/null || true
 # ── [6/7] NEP logo + cards.js ────────────────────────────────────────────────
 echo "[6/7] Installerer NEP logo og cards.js..."
 
-ASSETS_DIR="/opt/companion-satellite/satellite/assets"
+ASSETS_DIR="/opt/companion-satellite/satellite/dist/assets"
 CARDS_FILE="/opt/companion-satellite/satellite/dist/graphics/cards.js"
 
 if [ -d "$ASSETS_DIR" ]; then
