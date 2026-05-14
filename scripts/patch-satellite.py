@@ -5,7 +5,26 @@ import sys, shutil, re
 
 TARGET = '/opt/companion-satellite/satellite/dist/surface-entrypoint.mjs'
 
+ORIGINAL = TARGET + '.nep-original'
+
 try:
+    import os
+    if not os.path.exists(ORIGINAL):
+        with open(TARGET, 'r') as f:
+            peek = f.read(16384)
+        already_patched = f'_sx={SRC_X}' in peek or f'_lsx={SRC_X}' in peek
+        bak = TARGET + '.nep-bak'
+        if already_patched and os.path.exists(bak):
+            shutil.copy2(bak, ORIGINAL)
+            print('  Original hentet fra .nep-bak.')
+        elif already_patched:
+            print('FEIL: Finner ikke original. Reinstaller companion-satellite og prøv igjen.')
+            sys.exit(1)
+        else:
+            shutil.copy2(TARGET, ORIGINAL)
+            print('  Original lagret.')
+    # Always patch from original
+    shutil.copy2(ORIGINAL, TARGET)
     with open(TARGET, 'r') as f:
         src = f.read()
 except FileNotFoundError:
