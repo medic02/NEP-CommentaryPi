@@ -7,12 +7,20 @@ import socket, time, subprocess, os
 import psutil
 
 APP_ID        = os.environ.get("NEP_ID", "Satellite Pi")
-COMPANION_IP  = os.environ.get("COMPANION_IP", "192.168.8.101")
-COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 LAN_DEV       = os.environ.get("LAN_DEV", "eth0")
 TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
+COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
-FAILOVER_FLAG = "/home/pi/.nep-ts-failover-disabled"
+FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
+SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
+
+def get_companion_ip():
+    try:
+        import json
+        with open(SATELLITE_CONFIG) as f:
+            return json.load(f).get("remoteIp", os.environ.get("COMPANION_IP", "192.168.8.101"))
+    except Exception:
+        return os.environ.get("COMPANION_IP", "192.168.8.101")
 
 app = Flask(__name__)
 START_TIME = int(time.time())
@@ -48,12 +56,14 @@ def route_get(dst):
     except Exception:
         return ""
 
-def http_ok_via_lan():
+def http_ok_via_lan(companion_ip=None):
+    if companion_ip is None:
+        companion_ip = get_companion_ip()
     try:
         sh([
             "curl", "-sS", "-m", "2", "--connect-timeout", "2",
             "--interface", LAN_DEV, "-o", "/dev/null",
-            f"http://{COMPANION_IP}:{COMPANION_PORT}/"
+            f"http://{companion_ip}:{COMPANION_PORT}/"
         ], timeout=3)
         return True
     except Exception:
@@ -74,7 +84,8 @@ def failover_state():
 
 @app.route("/health")
 def health():
-    rg = route_get(COMPANION_IP)
+    companion_ip = get_companion_ip()
+    rg = route_get(companion_ip)
     using = "unknown"
     if f"dev {LAN_DEV}" in rg:
         using = "lan"
@@ -82,7 +93,7 @@ def health():
         using = "tailscale"
 
     cpu = get_cpu_temp_c()
-    lan_ok = http_ok_via_lan()
+    lan_ok = http_ok_via_lan(companion_ip)
 
     return jsonify({
         "id":         APP_ID,
@@ -91,7 +102,7 @@ def health():
         "uptime_sec": int(time.time() - START_TIME),
         "cpu_temp_c": cpu,
         "companion": {
-            "ip":       COMPANION_IP,
+            "ip":       companion_ip,
             "port":     COMPANION_PORT,
             "route":    rg,
             "using":    using,
@@ -122,6 +133,7 @@ def failover_toggle():
     btn_label  = "Aktiver failover" if disabled else "Deaktiver failover"
     btn_color  = "#00cc44" if disabled else "#ff4444"
 
+    companion_ip = get_companion_ip()
     html = f"""<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -137,7 +149,7 @@ form button{{padding:14px 32px;font-size:1.1em;border:none;border-radius:8px;
 </style></head>
 <body>
 <h1>Tailscale Failover</h1>
-<div class="sub">{APP_ID} · Companion {COMPANION_IP}</div>
+<div class="sub">{APP_ID} · Companion {companion_ip}</div>
 <div class="status">{status}</div>
 <form method="POST">
   <input type="hidden" name="action" value="{btn_action}">
