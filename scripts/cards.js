@@ -27,9 +27,12 @@ export class CardGenerator {
     context2d.scale(overSampling, overSampling);
 
     const conn = getConnType(remoteIp);
+    const failCount = getFailCount();
+    const localIp = getIPAddress();
+    const nepId = process.env.NEP_ID || 'Satellite Pi';
 
-    // Logo fills top 78% of button, scaled by width
-    const logoAreaH = Math.floor(height * 0.78);
+    // Logo fills top 55% of button
+    const logoAreaH = Math.floor(height * 0.55);
     const margin = 3;
     const scaleW = (width - margin * 2) / iconImage.width;
     const scaleH = (logoAreaH - margin) / iconImage.height;
@@ -40,18 +43,28 @@ export class CardGenerator {
     const drawY = Math.floor((logoAreaH - drawH) / 2);
     context2d.drawImage(iconImage, 0, 0, iconImage.width, iconImage.height, drawX, drawY, drawW, drawH);
 
-    // Status line
+    // Info section below logo
     const isConnected = status === 'Connected';
-    context2d.textAlign = 'center';
-    context2d.fillStyle = isConnected ? '#00cc44' : '#ff8800';
-    context2d.font = `bold 11px sans-serif`;
-    context2d.fillText(status, width / 2, logoAreaH + 13);
+    const connLabel = conn === 'LAN' ? 'LAN' : conn === 'TS' ? 'Tailscale' : 'Ingen';
+    const failLabel = failCount > 0 ? ` (feil: ${failCount})` : '';
 
-    // Conn type line
-    context2d.fillStyle = '#aaaaaa';
+    context2d.textAlign = 'left';
+    const padX = 5;
+    let y = logoAreaH + 11;
+    const lineH = 11;
+
+    context2d.font = `bold 10px sans-serif`;
+    context2d.fillStyle = isConnected ? '#00cc44' : '#ff8800';
+    context2d.fillText(status, padX, y); y += lineH;
+
     context2d.font = `9px sans-serif`;
-    const connLabel = conn === 'LAN' ? 'LAN' : conn === 'TS' ? 'Tailscale' : '–';
-    context2d.fillText(connLabel, width / 2, logoAreaH + 24);
+    context2d.fillStyle = '#ffffff';
+    context2d.fillText(`Nett: ${connLabel}${failLabel}`, padX, y); y += lineH;
+
+    context2d.fillStyle = '#aaaaaa';
+    context2d.fillText(`IP: ${localIp}`, padX, y); y += lineH;
+
+    context2d.fillText(nepId, padX, y);
 
     const rawImage = Buffer.from(context2d.getImageData(0, 0, canvasWidth, canvasHeight).data);
     const computedImage = await imageRs.ImageTransformer.fromBuffer(rawImage, canvasWidth, canvasHeight, 'rgba')
@@ -143,6 +156,15 @@ function getIPAddress() {
     }
   }
   return '0.0.0.0';
+}
+
+function getFailCount() {
+  try {
+    return parseInt(execSync('cat /run/nep-ts-failover/fail.count 2>/dev/null || echo 0',
+      { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 function getConnType(companionIp) {
