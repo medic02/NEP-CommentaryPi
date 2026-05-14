@@ -68,10 +68,8 @@ http_ok_via_lan() {
 }
 
 restart_satellite() {
-    logger -t "$LOGTAG" "Restarting satellite service for clean reconnect"
+    logger -t "$LOGTAG" "Flushing route cache for clean reconnect"
     ip route flush cache 2>/dev/null || true
-    sleep 1
-    systemctl restart satellite 2>/dev/null || true
 }
 
 # Nettverksendring: vent og reset tellere
