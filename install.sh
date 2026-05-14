@@ -188,8 +188,11 @@ ASSETS_DIR="/opt/companion-satellite/satellite/assets"
 CARDS_FILE="/opt/companion-satellite/satellite/dist/graphics/cards.js"
 
 if [ -d "$ASSETS_DIR" ]; then
-    sudo curl -fsSL "$GITHUB_RAW/assets/nep-logo.png" -o "$ASSETS_DIR/icon.png"
-    echo "  Logo installert."
+    if sudo curl -fsSL "$GITHUB_RAW/assets/nep-logo.png" -o "$ASSETS_DIR/icon.png" 2>/dev/null; then
+        echo "  Logo installert."
+    else
+        echo "  ADVARSEL: nep-logo.png ikke funnet i repo – hopper over logo."
+    fi
 else
     echo "  ADVARSEL: $ASSETS_DIR ikke funnet – hopper over logo."
 fi
