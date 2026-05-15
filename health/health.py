@@ -45,6 +45,11 @@ def get_companion_ip():
 app = Flask(__name__)
 START_TIME = int(time.time())
 
+@app.after_request
+def add_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
 def sh(cmd, timeout=3):
     return subprocess.check_output(
         cmd, stderr=subprocess.DEVNULL, timeout=timeout
@@ -129,6 +134,7 @@ def health():
             "lan_ok":   lan_ok,
         },
         "failover":   failover_state(),
+        "failover_enabled": not os.path.exists(FAILOVER_FLAG),
         "ts":         int(time.time())
     })
 

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEP Satellite Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+h1{font-size:1.3em;color:#e6edf3}
+.header-right{display:flex;align-items:center;gap:12px}
+.updated{font-size:.8em;color:#555}
+#refresh-dot{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;margin-right:6px;transition:background .2s}
+#refresh-dot.active{background:#00cc44}
+button{background:#1c2333;border:1px solid #30363d;color:#e6edf3;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.85em}
+button:hover{background:#21262d}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;transition:border-color .3s}
+.card.ok{border-color:#238636}
+.card.warn{border-color:#9e6a03}
+.card.offline{border-color:#6e3535;opacity:.7}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-name{font-weight:700;font-size:1em}
+.badge{font-size:.7em;padding:3px 8px;border-radius:12px;font-weight:600;white-space:nowrap}
+.badge-ok{background:#1a4731;color:#3fb950}
+.badge-ts{background:#3d2e00;color:#d29922}
+.badge-offline{background:#3d1f1f;color:#f85149}
+.badge-conn{background:#0d2d4a;color:#58a6ff}
+.rows{display:flex;flex-direction:column;gap:7px}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:.85em}
+.row .lbl{color:#8b949e}
+.row .val{color:#e6edf3;text-align:right}
+.val.green{color:#3fb950}
+.val.red{color:#f85149}
+.val.orange{color:#d29922}
+.val.blue{color:#58a6ff}
+.divider{border:none;border-top:1px solid #21262d;margin:8px 0}
+.add-section{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
+.add-section input{background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:8px 12px;border-radius:6px;font-size:.9em;flex:1;min-width:200px}
+.add-section input::placeholder{color:#555}
+.pi-list{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
+.pi-tag{background:#1c2333;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:.8em;display:flex;align-items:center;gap:8px}
+.pi-tag .rm{cursor:pointer;color:#8b949e;font-size:1.1em;line-height:1}
+.pi-tag .rm:hover{color:#f85149}
+.empty{color:#555;font-size:.9em;grid-column:1/-1;padding:40px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>NEP Satellite Dashboard</h1>
+  <div class="header-right">
+    <span class="updated"><span id="refresh-dot"></span><span id="updated-txt">–</span></span>
+    <button onclick="openConfig()">+ Legg til Pi</button>
+  </div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<div id="config-section" style="display:none;margin-top:24px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px">
+  <h2 style="font-size:.9em;color:#8b949e;margin-bottom:12px;text-transform:uppercase">Pi-adresser (IP:port)</h2>
+  <div class="add-section">
+    <input id="pi-input" type="text" placeholder="192.168.8.104:8080 eller 100.x.x.x:8080">
+    <button onclick="addPi()">Legg til</button>
+  </div>
+  <div class="pi-list" id="pi-list"></div>
+</div>
+
+<script>
+const STORAGE_KEY = 'nep_dashboard_pis';
+let pis = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let data = {};
+let interval;
+
+function savePis() { localStorage.setItem(STORAGE_KEY, JSON.stringify(pis)); }
+
+function openConfig() {
+  const s = document.getElementById('config-section');
+  s.style.display = s.style.display === 'none' ? 'block' : 'none';
+  renderPiList();
+}
+
+function renderPiList() {
+  const el = document.getElementById('pi-list');
+  el.innerHTML = pis.map((p,i) =>
+    `<div class="pi-tag">${p}<span class="rm" onclick="removePi(${i})">×</span></div>`
+  ).join('');
+}
+
+function addPi() {
+  const v = document.getElementById('pi-input').value.trim();
+  if (!v || pis.includes(v)) return;
+  pis.push(v);
+  savePis();
+  document.getElementById('pi-input').value = '';
+  renderPiList();
+  fetchAll();
+}
+
+function removePi(i) {
+  pis.splice(i, 1);
+  savePis();
+  delete data[pis[i]];
+  renderPiList();
+  render();
+}
+
+function fmt_uptime(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return h + 'h ' + m + 'm';
+}
+
+function render() {
+  const grid = document.getElementById('grid');
+  if (pis.length === 0) {
+    grid.innerHTML = '<div class="empty">Ingen Pi-er lagt til ennå.<br>Trykk "+ Legg til Pi" og skriv inn IP:port</div>';
+    return;
+  }
+
+  grid.innerHTML = pis.map(addr => {
+    const d = data[addr];
+    if (!d) return `
+      <div class="card offline">
+        <div class="card-header">
+          <span class="card-name">${addr}</span>
+          <span class="badge badge-offline">OFFLINE</span>
+        </div>
+        <div class="rows"><div class="row"><span class="lbl">Ingen kontakt</span></div></div>
+      </div>`;
+
+    const using = d.companion?.using || '?';
+    const lanOk = d.companion?.lan_ok;
+    const foEnabled = d.failover_enabled;
+    const failCount = d.failover?.fail_count || 0;
+    const isTs = using === 'tailscale';
+    const cardClass = isTs ? 'warn' : 'ok';
+    const connBadge = isTs
+      ? '<span class="badge badge-ts">TAILSCALE</span>'
+      : '<span class="badge badge-conn">LAN</span>';
+
+    const lanIp = (d.ip_addrs||[]).find(a => a.iface === 'eth0')?.ip || '–';
+    const tsIp  = (d.ip_addrs||[]).find(a => a.iface?.startsWith('tailscale'))?.ip || '–';
+    const temp  = d.cpu_temp_c != null ? d.cpu_temp_c + '°C' : '–';
+    const tempColor = d.cpu_temp_c > 70 ? 'red' : d.cpu_temp_c > 55 ? 'orange' : 'green';
+
+    return `
+      <div class="card ${cardClass}">
+        <div class="card-header">
+          <span class="card-name">${d.id || addr}</span>
+          ${connBadge}
+        </div>
+        <div class="rows">
+          <div class="row"><span class="lbl">Hostname</span><span class="val">${d.hostname||'–'}</span></div>
+          <div class="row"><span class="lbl">LAN IP</span><span class="val">${lanIp}</span></div>
+          <div class="row"><span class="lbl">Tailscale IP</span><span class="val">${tsIp}</span></div>
+          <div class="row"><span class="lbl">Uptime</span><span class="val">${fmt_uptime(d.uptime_sec||0)}</span></div>
+          <hr class="divider">
+          <div class="row"><span class="lbl">Companion</span><span class="val">${d.companion?.ip||'–'}:${d.companion?.port||'–'}</span></div>
+          <div class="row"><span class="lbl">Tilkobling</span><span class="val ${isTs?'orange':'blue'}">${isTs?'Tailscale':'LAN'}</span></div>
+          <div class="row"><span class="lbl">LAN tilgjengelig</span><span class="val ${lanOk?'green':'red'}">${lanOk?'Ja':'Nei'}</span></div>
+          <div class="row"><span class="lbl">Failover</span><span class="val ${foEnabled?'green':'red'}">${foEnabled?'Aktiv':'Deaktivert'}</span></div>
+          <div class="row"><span class="lbl">Feilteljer</span><span class="val ${failCount>0?'orange':''}">${failCount}</span></div>
+          <hr class="divider">
+          <div class="row"><span class="lbl">CPU-temp</span><span class="val ${tempColor}">${temp}</span></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function fetchPi(addr) {
+  try {
+    const r = await fetch(`http://${addr}/health`, {signal: AbortSignal.timeout(4000)});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    data[addr] = await r.json();
+  } catch {
+    data[addr] = null;
+  }
+}
+
+async function fetchAll() {
+  const dot = document.getElementById('refresh-dot');
+  dot.classList.add('active');
+  await Promise.all(pis.map(fetchPi));
+  render();
+  dot.classList.remove('active');
+  document.getElementById('updated-txt').textContent =
+    'Oppdatert ' + new Date().toLocaleTimeString('no');
+}
+
+renderPiList();
+render();
+if (pis.length) fetchAll();
+interval = setInterval(fetchAll, 5000);
+</script>
+</body>
+</html>
