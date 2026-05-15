@@ -3,7 +3,7 @@
 # Kjører på port 8080, eksponerer /health
 
 from flask import Flask, jsonify, request, Response, redirect, send_file
-import socket, time, subprocess, os, json
+import socket, time, subprocess, os, json, re
 import psutil
 
 APP_ID        = os.environ.get("NEP_ID", "Satellite Pi")
@@ -348,6 +348,21 @@ button:active{{background:#357acc}}
 <div class="nav"><a href="/failover">← Failover</a></div>
 </body></html>"""
     return Response(html, mimetype="text/html")
+
+
+@app.route("/ping")
+def ping_host():
+    host = request.args.get("host", "").strip()
+    if not host or not re.match(r'^[a-zA-Z0-9.\-:]+$', host):
+        return jsonify({"online": False, "error": "invalid host"})
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "1", host],
+            capture_output=True, timeout=3
+        )
+        return jsonify({"online": result.returncode == 0, "host": host})
+    except Exception:
+        return jsonify({"online": False, "host": host})
 
 
 if __name__ == "__main__":

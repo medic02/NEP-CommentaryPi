@@ -311,6 +311,43 @@ body{
 .empty-state .icon{font-size:2.8em;margin-bottom:16px;opacity:.25;display:block}
 .empty-state p{font-size:.88em;margin-bottom:20px;color:var(--muted)}
 .empty-state .btn{margin:0 auto;width:fit-content}
+
+/* ── DEVICE TYPE SELECTOR ── */
+.type-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px}
+.type-btn{
+  padding:8px 4px;font-size:.72em;font-weight:600;border-radius:8px;
+  border:1px solid var(--border-strong);background:rgba(255,255,255,0.03);
+  color:var(--text2);cursor:pointer;text-align:center;transition:all .15s;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.type-btn .ticon{font-size:1.3em;line-height:1}
+.type-btn:hover{background:rgba(255,255,255,0.07);color:var(--text)}
+.type-btn.active{background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.35);color:var(--blue)}
+
+/* ── DEVICE CARD (ping-only) ── */
+.dcard{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;position:relative;backdrop-filter:blur(8px);
+  transition:transform .2s ease,box-shadow .2s ease;
+}
+.dcard::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--dacca,transparent),transparent);
+}
+.dcard:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.dcard.d-online{--dacca:var(--green);border-color:rgba(0,210,106,0.12)}
+.dcard.d-offline{--dacca:var(--red);border-color:rgba(239,68,68,0.1);opacity:.55}
+.dcard-inner{padding:16px;display:flex;align-items:center;gap:14px}
+.dcard-icon{font-size:1.8em;line-height:1;flex-shrink:0;opacity:.85}
+.dcard-info{flex:1;min-width:0}
+.dcard-name{font-weight:700;font-size:.92em;margin-bottom:3px}
+.dcard-ip{font-size:.72em;color:var(--muted);font-family:var(--mono)}
+.dcard-status{font-size:.72em;font-weight:600;margin-top:4px}
+.dcard-status.online{color:var(--green)}
+.dcard-status.offline{color:var(--red)}
+.dcard-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dcard-dot.online{background:var(--green);box-shadow:0 0 6px rgba(0,210,106,.4);animation:ring-pulse-green 2s ease-out infinite}
+.dcard-dot.offline{background:var(--red)}
 </style>
 </head>
 <body>
@@ -342,18 +379,36 @@ body{
 <!-- ── MODAL ── -->
 <div class="modal-bg" id="modal" onclick="e=>e.target===this&&closeModal()">
   <div class="modal" onclick="event.stopPropagation()">
-    <h2 id="modal-title">Legg til Pi</h2>
+    <h2 id="modal-title">Legg til enhet</h2>
+    <div class="field">
+      <label>Type</label>
+      <div class="type-grid" id="type-grid">
+        <button type="button" class="type-btn active" onclick="setDevType('pi')"><span class="ticon">🖥</span>Pi</button>
+        <button type="button" class="type-btn" onclick="setDevType('switch')"><span class="ticon">🔀</span>Switch</button>
+        <button type="button" class="type-btn" onclick="setDevType('router')"><span class="ticon">📡</span>Ruter</button>
+        <button type="button" class="type-btn" onclick="setDevType('videohub')"><span class="ticon">🎬</span>Videohub</button>
+        <button type="button" class="type-btn" onclick="setDevType('device')"><span class="ticon">⚡</span>Annen</button>
+      </div>
+    </div>
     <div class="field">
       <label>Navn (valgfritt)</label>
-      <input id="f-name" type="text" placeholder="Satellite Pi 1">
+      <input id="f-name" type="text" placeholder="Switch 1">
     </div>
-    <div class="field">
-      <label>LAN IP <span style="color:var(--muted);font-weight:400">(port 8080 legges til automatisk)</span></label>
-      <input id="f-lan" type="text" placeholder="192.168.8.104">
+    <div id="pi-fields">
+      <div class="field">
+        <label>LAN IP <span style="color:var(--muted);font-weight:400">(port 8080 legges til automatisk)</span></label>
+        <input id="f-lan" type="text" placeholder="192.168.8.104">
+      </div>
+      <div class="field">
+        <label>Tailscale IP</label>
+        <input id="f-ts" type="text" placeholder="100.x.x.x">
+      </div>
     </div>
-    <div class="field">
-      <label>Tailscale IP</label>
-      <input id="f-ts" type="text" placeholder="100.x.x.x">
+    <div id="device-fields" style="display:none">
+      <div class="field">
+        <label>IP-adresse</label>
+        <input id="f-ip" type="text" placeholder="192.168.8.10">
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeModal()">Avbryt</button>
@@ -367,6 +422,17 @@ const KEY = 'nep_pis_v2';
 let pis = JSON.parse(localStorage.getItem(KEY) || '[]');
 let live = {};
 let editIdx = -1;
+let currentType = 'pi';
+function setDevType(t){
+  currentType=t;
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const isPi=t==='pi';
+  document.getElementById('pi-fields').style.display=isPi?'':'none';
+  document.getElementById('device-fields').style.display=isPi?'none':'';
+  const names={pi:'Satellite Pi 1',switch:'Switch 1',router:'Ruter 1',videohub:'Videohub 1',device:'Enhet 1'};
+  document.getElementById('f-name').placeholder=names[t]||'Enhet 1';
+}
 
 async function saveToDisk(){
   localStorage.setItem(KEY, JSON.stringify(pis));
@@ -388,10 +454,34 @@ async function loadConfig(){
 }
 
 // ── MODAL ──
-function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-title').textContent='Legg til Pi'; document.getElementById('modal').classList.add('show'); }
-function openEdit(i){ editIdx=i; const p=pis[i]; document.getElementById('f-name').value=p.name||''; document.getElementById('f-lan').value=p.lan||''; document.getElementById('f-ts').value=p.ts||''; document.getElementById('modal-title').textContent='Rediger Pi'; document.getElementById('modal').classList.add('show'); }
+function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-title').textContent='Legg til enhet'; document.getElementById('modal').classList.add('show'); }
+function openEdit(i){
+  editIdx=i;
+  const p=pis[i];
+  const t=p.type||'pi';
+  currentType=t;
+  document.getElementById('f-name').value=p.name||'';
+  document.getElementById('f-lan').value=p.lan||'';
+  document.getElementById('f-ts').value=p.ts||'';
+  const fip=document.getElementById('f-ip');
+  if(fip)fip.value=p.ip||'';
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  const types=['pi','switch','router','videohub','device'];
+  const idx=types.indexOf(t);
+  if(idx>=0)document.querySelectorAll('.type-btn')[idx].classList.add('active');
+  document.getElementById('pi-fields').style.display=t==='pi'?'':'none';
+  document.getElementById('device-fields').style.display=t==='pi'?'none':'';
+  document.getElementById('modal-title').textContent='Rediger enhet';
+  document.getElementById('modal').classList.add('show');
+}
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
-function clearForm(){ ['f-name','f-lan','f-ts'].forEach(id=>document.getElementById(id).value=''); }
+function clearForm(){
+  ['f-name','f-lan','f-ts','f-ip'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  currentType='pi';
+  document.querySelectorAll('.type-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.getElementById('pi-fields').style.display='';
+  document.getElementById('device-fields').style.display='none';
+}
 function normalizeAddr(v){
   if(!v)return '';
   v=v.trim();
@@ -399,10 +489,17 @@ function normalizeAddr(v){
 }
 function savePi(){
   const name=document.getElementById('f-name').value.trim();
-  const lan=normalizeAddr(document.getElementById('f-lan').value);
-  const ts=normalizeAddr(document.getElementById('f-ts').value);
-  if(!lan&&!ts)return;
-  const obj={name,lan,ts};
+  let obj;
+  if(currentType==='pi'){
+    const lan=normalizeAddr(document.getElementById('f-lan').value);
+    const ts=normalizeAddr(document.getElementById('f-ts').value);
+    if(!lan&&!ts)return;
+    obj={type:'pi',name,lan,ts};
+  } else {
+    const ip=(document.getElementById('f-ip').value||'').trim();
+    if(!ip)return;
+    obj={type:currentType,name,ip};
+  }
   if(editIdx>=0) pis[editIdx]=obj; else pis.push(obj);
   saveToDisk(); closeModal(); renderManage(); fetchAll();
 }
@@ -420,7 +517,7 @@ function renderManage(){
     <div class="pi-row">
       <div class="pi-row-info">
         <span class="pi-row-name">${p.name||'Pi #'+(i+1)}</span>
-        <span class="pi-row-ips">${[p.lan&&'LAN: '+p.lan,p.ts&&'TS: '+p.ts].filter(Boolean).join(' · ')}</span>
+        <span class="pi-row-ips">${p.type&&p.type!=='pi'?'IP: '+p.ip:[p.lan&&'LAN: '+p.lan,p.ts&&'TS: '+p.ts].filter(Boolean).join(' · ')}</span>
       </div>
       <div class="pi-row-actions">
         <button class="btn btn-sm" onclick="openEdit(${i})">Rediger</button>
@@ -466,15 +563,44 @@ async function fetchPi(p){
   }
   live[key]=null;
 }
+async function fetchDevice(p){
+  const key=JSON.stringify(p);
+  try{
+    const r=await fetch(`/ping?host=${encodeURIComponent(p.ip)}`,{signal:AbortSignal.timeout(4000)});
+    const d=await r.json();
+    live[key]={online:d.online,_type:p.type};
+  }catch{
+    live[key]={online:false,_type:p.type};
+  }
+}
 async function fetchAll(){
   const ring=document.getElementById('refresh-ring');
   ring.classList.add('spin');
-  await Promise.all(pis.map(fetchPi));
+  await Promise.all(pis.map(p=>(p.type&&p.type!=='pi')?fetchDevice(p):fetchPi(p)));
   render();
   ring.classList.remove('spin');
 }
 
 // ── RENDER ──
+const DTYPE_ICON={pi:'🖥',switch:'🔀',router:'📡',videohub:'🎬',device:'⚡'};
+const DTYPE_LABEL={pi:'Pi',switch:'Switch',router:'Ruter',videohub:'Videohub',device:'Enhet'};
+function renderDeviceCard(p,d){
+  const online=d?.online||false;
+  const name=p.name||(DTYPE_LABEL[p.type]||'Enhet');
+  const icon=DTYPE_ICON[p.type]||'⚡';
+  return `
+    <div class="dcard ${online?'d-online':'d-offline'}">
+      <div class="dcard-inner">
+        <div class="dcard-dot ${online?'online':'offline'}"></div>
+        <div class="dcard-icon">${icon}</div>
+        <div class="dcard-info">
+          <div class="dcard-name">${name}</div>
+          <div class="dcard-ip">${p.ip||'–'}</div>
+          <div class="dcard-status ${online?'online':'offline'}">${online?'Online':'Offline'}</div>
+        </div>
+      </div>
+    </div>`;
+}
 function uptime(s){
   if(s<60)return s+'s';
   if(s<3600)return Math.floor(s/60)+'m';
@@ -491,6 +617,12 @@ function render(){
   }
   let online=0,tsCount=0;
   grid.innerHTML=pis.map((p,idx)=>{
+    if(p.type&&p.type!=='pi'){
+      const key=JSON.stringify(p);
+      const d=live[key];
+      if(d?.online)online++;
+      return renderDeviceCard(p,d);
+    }
     const key=JSON.stringify(p);
     const d=live[key];
     const name=p.name||(d?.id)||'Pi';
