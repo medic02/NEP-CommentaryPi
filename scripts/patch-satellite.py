@@ -70,7 +70,7 @@ OLD_BASIC = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0
     context2d.fillText(`Status: ${status}`, 10, height - 50);'''
 
 NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H};
-    const _lh=Math.floor(height*0.38),_m=4;
+    const _lh=Math.floor(height*0.34),_m=4;
     const _sc=Math.min((width-_m*2)/_sw,(_lh-4)/_sh);
     const _dw=Math.max(1,Math.floor(_sw*_sc)),_dh=Math.max(1,Math.floor(_sh*_sc));
     context2d.drawImage(iconImage,_sx,_sy,_sw,_sh,Math.floor((width-_dw)/2),Math.floor((_lh-_dh)/2),_dw,_dh);
@@ -84,14 +84,14 @@ NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H};
     let _y=_lh+10;
     context2d.font="bold 10px sans-serif";
     context2d.fillStyle=status==="Connected"?"#00cc44":"#ff8800";
-    context2d.fillText(status,4,_y);_y+=11;
+    context2d.fillText(status,4,_y);_y+=10;
     context2d.font="9px sans-serif";
     context2d.fillStyle="#aaaaaa";
-    context2d.fillText("C:"+_cip,4,_y);_y+=10;
+    context2d.fillText("C:"+_cip,4,_y);_y+=9;
     context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";
-    context2d.fillText(_conn+" FO:"+_fo,4,_y);_y+=10;
+    context2d.fillText(_conn+" FO:"+_fo,4,_y);_y+=9;
     context2d.fillStyle="#cccccc";
-    context2d.fillText("IP:"+getIPAddress(),4,_y);_y+=10;
+    context2d.fillText("IP:"+getIPAddress(),4,_y);_y+=9;
     context2d.fillStyle="#888888";
     context2d.fillText("{nep_id}",4,_y);'''
 
