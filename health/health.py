@@ -2,7 +2,7 @@
 # NEP Kommentatorkit – Health API
 # Kjører på port 8080, eksponerer /health
 
-from flask import Flask, jsonify, request, Response, redirect
+from flask import Flask, jsonify, request, Response, redirect, send_file
 import socket, time, subprocess, os, json
 import psutil
 
@@ -53,6 +53,13 @@ def get_companion_ip():
 
 app = Flask(__name__)
 START_TIME = int(time.time())
+
+@app.route("/logo.png")
+def logo():
+    try:
+        return send_file("/home/pi/health/nep-logo.png", mimetype="image/png")
+    except Exception:
+        return Response("", status=404)
 
 @app.route("/")
 def dashboard():

@@ -62,6 +62,7 @@ deactivate
 
 curl -fsSL "$GITHUB_RAW/health/health.py" -o "$BASE/health.py"
 curl -fsSL "$GITHUB_RAW/docs/index.html"  -o "$BASE/dashboard.html"
+curl -fsSL "$GITHUB_RAW/assets/nep-logo.png" -o "$BASE/nep-logo.png" 2>/dev/null || true
 chmod +x "$BASE/health.py"
 
 sudo tee /etc/systemd/system/nep-health.service > /dev/null <<EOF
