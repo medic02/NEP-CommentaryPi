@@ -117,6 +117,10 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .btn-sm{padding:4px 10px;font-size:.75em}
 .btn-del{border-color:var(--red-dim);color:var(--red)}
 .btn-del:hover{background:var(--red-dim)}
+.btn-fo-on{border-color:var(--green-dim);color:var(--green)}
+.btn-fo-on:hover{background:var(--green-dim)}
+.btn-fo-off{border-color:var(--red-dim);color:var(--red)}
+.btn-fo-off:hover{background:var(--red-dim)}
 
 /* ── EMPTY ── */
 .empty-state{grid-column:1/-1;padding:60px 24px;text-align:center;color:var(--muted)}
@@ -164,12 +168,12 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
       <input id="f-name" type="text" placeholder="Satellite Pi 1">
     </div>
     <div class="field">
-      <label>LAN IP:port</label>
-      <input id="f-lan" type="text" placeholder="192.168.8.104:8080">
+      <label>LAN IP <span style="color:var(--muted);font-weight:400">(port 8080 legges til automatisk)</span></label>
+      <input id="f-lan" type="text" placeholder="192.168.8.104">
     </div>
     <div class="field">
-      <label>Tailscale IP:port</label>
-      <input id="f-ts" type="text" placeholder="100.x.x.x:8080">
+      <label>Tailscale IP</label>
+      <input id="f-ts" type="text" placeholder="100.x.x.x">
     </div>
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeModal()">Avbryt</button>
@@ -191,10 +195,15 @@ function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-titl
 function openEdit(i){ editIdx=i; const p=pis[i]; document.getElementById('f-name').value=p.name||''; document.getElementById('f-lan').value=p.lan||''; document.getElementById('f-ts').value=p.ts||''; document.getElementById('modal-title').textContent='Rediger Pi'; document.getElementById('modal').classList.add('show'); }
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
 function clearForm(){ ['f-name','f-lan','f-ts'].forEach(id=>document.getElementById(id).value=''); }
+function normalizeAddr(v){
+  if(!v)return '';
+  v=v.trim();
+  return v.includes(':')?v:v+':8080';
+}
 function savePi(){
   const name=document.getElementById('f-name').value.trim();
-  const lan=document.getElementById('f-lan').value.trim();
-  const ts=document.getElementById('f-ts').value.trim();
+  const lan=normalizeAddr(document.getElementById('f-lan').value);
+  const ts=normalizeAddr(document.getElementById('f-ts').value);
   if(!lan&&!ts)return;
   const obj={name,lan,ts};
   if(editIdx>=0) pis[editIdx]=obj; else pis.push(obj);
@@ -221,6 +230,28 @@ function renderManage(){
         <button class="btn btn-sm btn-del" onclick="deletePi(${i})">Slett</button>
       </div>
     </div>`).join('');
+}
+
+// ── FAILOVER TOGGLE ──
+async function toggleFailover(idx, action){
+  const p=pis[idx];
+  const key=JSON.stringify(p);
+  const d=live[key];
+  const addr=d?._via==='ts'?p.ts:p.lan;
+  if(!addr)return;
+  try{
+    await fetch(`http://${addr}/failover`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'action='+action,
+      signal:AbortSignal.timeout(5000)
+    });
+    live[key]={...await (async()=>{
+      const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
+      return r.json();
+    })(),_via:d._via};
+    render();
+  }catch(e){console.error(e);}
 }
 
 // ── FETCH ──
@@ -264,7 +295,7 @@ function render(){
     return;
   }
   let online=0,tsCount=0;
-  grid.innerHTML=pis.map(p=>{
+  grid.innerHTML=pis.map((p,idx)=>{
     const key=JSON.stringify(p);
     const d=live[key];
     const name=p.name||(d?.id)||'Pi';
@@ -320,6 +351,9 @@ function render(){
             <div class="section-label">Failover</div>
             <div class="kv"><span class="k">Status</span><span class="v ${fo?'green':'red'}">${fo?'Aktiv':'Deaktivert'}</span></div>
             <div class="kv"><span class="k">Feilteljer</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
+            <div style="margin-top:8px">
+              <button class="btn btn-sm ${fo?'btn-fo-off':'btn-fo-on'}" onclick="toggleFailover(${idx},'${fo?'disable':'enable'}')">${fo?'Deaktiver failover':'Aktiver failover'}</button>
+            </div>
           </div>
           <hr class="divider">
           <div class="section">
