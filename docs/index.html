@@ -336,9 +336,8 @@ function render(){
         <div class="card-body">
           <div class="section">
             <div class="section-label">Companion</div>
+            <div class="kv"><span class="k">Status</span><span class="v ${d.companion?.lan_ok?'green':isTs?'orange':'red'}">${d.companion?.lan_ok?'Tilkoblet (LAN)':isTs?'Tilkoblet (TS)':'Ikke tilkoblet'}</span></div>
             <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
-            <div class="kv"><span class="k">Tilkobling</span><span class="v ${isTs?'purple':'blue'}">${isTs?'Tailscale':'LAN'}</span></div>
-            <div class="kv"><span class="k">LAN tilgjengelig</span><span class="v ${d.companion?.lan_ok?'green':'red'}">${d.companion?.lan_ok?'Ja':'Nei'}</span></div>
           </div>
           <hr class="divider">
           <div class="section">
