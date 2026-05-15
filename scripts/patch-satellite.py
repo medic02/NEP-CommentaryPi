@@ -76,7 +76,7 @@ NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H},_m=4;
     try{{_cip=_fsm.readFileSync('/run/nep-ts-failover/companion_ip','utf8').trim()||'?';}}catch{{}}
     try{{_fo=_fsm.existsSync('/home/pi/.nep-ts-failover-disabled')?'AV':'AKT';}}catch{{}}
     try{{const _rt=_cp.execSync('ip route get '+_cip+' 2>/dev/null||echo x',{{encoding:'utf8'}});_conn=_rt.includes('dev eth0')?'LAN':_rt.includes('tailscale')?'TS':'?';}}catch{{}}
-    try{{Object.assign(_cfg,JSON.parse(_fsm.readFileSync('/home/pi/health/card-config.json','utf8')));}}catch{{}}
+    try{{Object.assign(_cfg,JSON.parse(_fsm.readFileSync('/run/nep-ts-failover/card-config.json','utf8')));}}catch{{}}
     }}catch{{}}
     const _lh=Math.floor(height*Math.max(15,Math.min(55,_cfg.logo_pct||34))/100);
     const _sc=Math.min((width-_m*2)/_sw,(_lh-4)/_sh);
