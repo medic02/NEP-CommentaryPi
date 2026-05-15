@@ -13,7 +13,7 @@ COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
-CARD_CONFIG_FILE  = "/run/nep-ts-failover/card-config.json"
+CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 
 DEFAULT_CARD_CONFIG = {
     "logo_pct": 34,
@@ -191,10 +191,11 @@ def settings():
             "show_local_ip":     "show_local_ip"     in request.form,
             "show_name":         "show_name"         in request.form,
         }
-        os.makedirs(os.path.dirname(CARD_CONFIG_FILE), exist_ok=True)
         with open(CARD_CONFIG_FILE, "w") as f:
             json.dump(cfg, f)
         os.chmod(CARD_CONFIG_FILE, 0o644)
+        os.chmod("/home/pi/health", 0o755)
+        os.chmod("/home/pi", 0o755)
         saved = True
 
     companion_ip = get_companion_ip()
