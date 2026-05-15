@@ -69,31 +69,30 @@ OLD_BASIC = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0
     context2d.fillText(`Local: ${getIPAddress()}`, 10, height - 30);
     context2d.fillText(`Status: ${status}`, 10, height - 50);'''
 
-NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H};
-    const _lh=Math.floor(height*0.34),_m=4;
+NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H},_m=4;
+    let _cip='?',_conn='?',_fo='?';
+    let _cfg={{logo_pct:34,font_size:9,line_spacing:9,show_companion_ip:true,show_conn_fo:true,show_local_ip:true,show_name:true}};
+    try{{const _fsm=process.getBuiltinModule('fs');const _cp=process.getBuiltinModule('child_process');
+    try{{_cip=_fsm.readFileSync('/run/nep-ts-failover/companion_ip','utf8').trim()||'?';}}catch{{}}
+    try{{_fo=_fsm.existsSync('/home/pi/.nep-ts-failover-disabled')?'AV':'AKT';}}catch{{}}
+    try{{const _rt=_cp.execSync('ip route get '+_cip+' 2>/dev/null||echo x',{{encoding:'utf8'}});_conn=_rt.includes('dev eth0')?'LAN':_rt.includes('tailscale')?'TS':'?';}}catch{{}}
+    try{{Object.assign(_cfg,JSON.parse(_fsm.readFileSync('/home/pi/health/card-config.json','utf8')));}}catch{{}}
+    }}catch{{}}
+    const _lh=Math.floor(height*Math.max(15,Math.min(55,_cfg.logo_pct||34))/100);
     const _sc=Math.min((width-_m*2)/_sw,(_lh-4)/_sh);
     const _dw=Math.max(1,Math.floor(_sw*_sc)),_dh=Math.max(1,Math.floor(_sh*_sc));
     context2d.drawImage(iconImage,_sx,_sy,_sw,_sh,Math.floor((width-_dw)/2),Math.floor((_lh-_dh)/2),_dw,_dh);
-    let _cip='?',_conn='?',_fo='?';
-    try{{const _fs=process.getBuiltinModule('fs');const _cp=process.getBuiltinModule('child_process');
-    try{{_cip=_fs.readFileSync('/run/nep-ts-failover/companion_ip','utf8').trim()||'?';}}catch{{}}
-    try{{_fo=_fs.existsSync('/home/pi/.nep-ts-failover-disabled')?'AV':'AKT';}}catch{{}}
-    try{{const _rt=_cp.execSync('ip route get '+_cip+' 2>/dev/null||echo x',{{encoding:'utf8'}});_conn=_rt.includes('dev eth0')?'LAN':_rt.includes('tailscale')?'TS':'?';}}catch{{}}
-    }}catch{{}}
+    const _fz=_cfg.font_size||9;const _ls=_cfg.line_spacing||9;
     context2d.textAlign="left";
     let _y=_lh+10;
-    context2d.font="bold 10px sans-serif";
+    context2d.font="bold "+(_fz+1)+"px sans-serif";
     context2d.fillStyle=status==="Connected"?"#00cc44":"#ff8800";
-    context2d.fillText(status,4,_y);_y+=10;
-    context2d.font="9px sans-serif";
-    context2d.fillStyle="#aaaaaa";
-    context2d.fillText("C:"+_cip,4,_y);_y+=9;
-    context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";
-    context2d.fillText(_conn+" FO:"+_fo,4,_y);_y+=9;
-    context2d.fillStyle="#cccccc";
-    context2d.fillText("IP:"+getIPAddress(),4,_y);_y+=9;
-    context2d.fillStyle="#888888";
-    context2d.fillText("{nep_id}",4,_y);'''
+    context2d.fillText(status,4,_y);_y+=(_fz+2);
+    context2d.font=_fz+"px sans-serif";
+    if(_cfg.show_companion_ip!==false){{context2d.fillStyle="#aaaaaa";context2d.fillText("C:"+_cip,4,_y);_y+=_ls;}}
+    if(_cfg.show_conn_fo!==false){{context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";context2d.fillText(_conn+" FO:"+_fo,4,_y);_y+=_ls;}}
+    if(_cfg.show_local_ip!==false){{context2d.fillStyle="#cccccc";context2d.fillText("IP:"+getIPAddress(),4,_y);_y+=_ls;}}
+    if(_cfg.show_name!==false){{context2d.fillStyle="#888888";context2d.fillText("{nep_id}",4,_y);}}'''
 
 OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.8);
     const iconTargetX = (width - iconTargetSize) / 2;

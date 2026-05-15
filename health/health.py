@@ -3,7 +3,7 @@
 # Kjører på port 8080, eksponerer /health
 
 from flask import Flask, jsonify, request, Response
-import socket, time, subprocess, os
+import socket, time, subprocess, os, json
 import psutil
 
 APP_ID        = os.environ.get("NEP_ID", "Satellite Pi")
@@ -13,6 +13,24 @@ COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
+CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
+
+DEFAULT_CARD_CONFIG = {
+    "logo_pct": 34,
+    "font_size": 9,
+    "line_spacing": 9,
+    "show_companion_ip": True,
+    "show_conn_fo": True,
+    "show_local_ip": True,
+    "show_name": True,
+}
+
+def get_card_config():
+    try:
+        with open(CARD_CONFIG_FILE) as f:
+            return {**DEFAULT_CARD_CONFIG, **json.load(f)}
+    except Exception:
+        return dict(DEFAULT_CARD_CONFIG)
 
 def get_companion_ip():
     # Prøv world-readable kopi skrevet av failover-script (root)
@@ -155,6 +173,98 @@ form button{{padding:14px 32px;font-size:1.1em;border:none;border-radius:8px;
   <input type="hidden" name="action" value="{btn_action}">
   <button type="submit">{btn_label}</button>
 </form>
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    cfg = get_card_config()
+    saved = False
+    if request.method == "POST":
+        cfg = {
+            "logo_pct":        max(15, min(55, int(request.form.get("logo_pct", 34)))),
+            "font_size":       max(7,  min(14, int(request.form.get("font_size", 9)))),
+            "line_spacing":    max(7,  min(14, int(request.form.get("line_spacing", 9)))),
+            "show_companion_ip": "show_companion_ip" in request.form,
+            "show_conn_fo":      "show_conn_fo"      in request.form,
+            "show_local_ip":     "show_local_ip"     in request.form,
+            "show_name":         "show_name"         in request.form,
+        }
+        with open(CARD_CONFIG_FILE, "w") as f:
+            json.dump(cfg, f)
+        saved = True
+
+    companion_ip = get_companion_ip()
+    chk = lambda k: "checked" if cfg.get(k) else ""
+
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEP Kortinnstillinger – {APP_ID}</title>
+<style>
+*{{box-sizing:border-box}}
+body{{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;
+     display:flex;flex-direction:column;align-items:center;padding:32px 16px;gap:0}}
+h1{{margin-bottom:4px;font-size:1.4em}}
+.sub{{color:#888;margin-bottom:24px;font-size:.9em}}
+.saved{{color:#00cc44;margin-bottom:16px;font-weight:bold}}
+form{{width:100%;max-width:420px;display:flex;flex-direction:column;gap:20px}}
+.section{{background:#161b22;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}}
+.section h2{{font-size:.85em;text-transform:uppercase;color:#888;margin:0 0 4px}}
+.row{{display:flex;align-items:center;justify-content:space-between;gap:12px}}
+.row label{{font-size:.95em;flex:1}}
+.row input[type=range]{{flex:2;accent-color:#4f9cf9}}
+.val{{min-width:28px;text-align:right;color:#4f9cf9;font-size:.9em}}
+.toggle{{display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px 0}}
+.toggle input{{width:18px;height:18px;accent-color:#4f9cf9;cursor:pointer}}
+.toggle span{{font-size:.95em}}
+button{{padding:14px;font-size:1em;border:none;border-radius:8px;
+        background:#4f9cf9;color:#fff;cursor:pointer;font-weight:bold;margin-top:4px}}
+button:active{{background:#357acc}}
+.nav{{margin-top:20px;font-size:.85em;color:#888}}
+.nav a{{color:#4f9cf9;text-decoration:none}}
+</style></head>
+<body>
+<h1>Kortinnstillinger</h1>
+<div class="sub">{APP_ID} · Companion {companion_ip}</div>
+{"<div class='saved'>✓ Lagret – endringer vises innen få sekunder</div>" if saved else ""}
+<form method="POST">
+  <div class="section">
+    <h2>Layout</h2>
+    <div class="row">
+      <label for="logo_pct">Logostørrelse</label>
+      <input type="range" id="logo_pct" name="logo_pct" min="15" max="55" value="{cfg['logo_pct']}"
+             oninput="this.nextElementSibling.textContent=this.value+'%'">
+      <span class="val">{cfg['logo_pct']}%</span>
+    </div>
+    <div class="row">
+      <label for="font_size">Skriftstørrelse</label>
+      <input type="range" id="font_size" name="font_size" min="7" max="14" value="{cfg['font_size']}"
+             oninput="this.nextElementSibling.textContent=this.value+'px'">
+      <span class="val">{cfg['font_size']}px</span>
+    </div>
+    <div class="row">
+      <label for="line_spacing">Linjeavstand</label>
+      <input type="range" id="line_spacing" name="line_spacing" min="7" max="14" value="{cfg['line_spacing']}"
+             oninput="this.nextElementSibling.textContent=this.value+'px'">
+      <span class="val">{cfg['line_spacing']}px</span>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Vis info</h2>
+    <label class="toggle"><input type="checkbox" name="show_companion_ip" {chk('show_companion_ip')}>
+      <span>Companion IP (C:192.168.8.x)</span></label>
+    <label class="toggle"><input type="checkbox" name="show_conn_fo" {chk('show_conn_fo')}>
+      <span>Tilkobling &amp; failover (LAN FO:AKT)</span></label>
+    <label class="toggle"><input type="checkbox" name="show_local_ip" {chk('show_local_ip')}>
+      <span>Lokal IP (IP:192.168.8.x)</span></label>
+    <label class="toggle"><input type="checkbox" name="show_name" {chk('show_name')}>
+      <span>Pi-navn ({APP_ID})</span></label>
+  </div>
+  <button type="submit">Lagre</button>
+</form>
+<div class="nav"><a href="/failover">← Failover</a></div>
 </body></html>"""
     return Response(html, mimetype="text/html")
 
