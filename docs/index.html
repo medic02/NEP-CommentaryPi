@@ -135,6 +135,11 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .ts-indicator{font-size:.7em;color:var(--muted);margin-top:2px}
 .ts-indicator.via-ts{color:var(--purple)}
 .ts-indicator.via-lan{color:var(--green)}
+.ssh-btn{display:inline-flex;align-items:center;gap:5px;margin-top:10px;
+  padding:6px 12px;font-size:.75em;font-weight:600;border-radius:6px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+  text-decoration:none;cursor:pointer;transition:all .15s}
+.ssh-btn:hover{background:var(--border);color:var(--text)}
 </style>
 </head>
 <body>
@@ -363,6 +368,7 @@ function render(){
             <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
             ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
             <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
+            ${(()=>{const sshIp=(viaTs?p.ts:p.lan||p.ts||'').split(':')[0];return sshIp?`<a class="ssh-btn" href="ssh://pi@${sshIp}">⌨ SSH</a>`:''})()}
           </div>
         </div>
       </div>`;
