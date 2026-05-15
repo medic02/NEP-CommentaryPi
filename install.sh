@@ -89,6 +89,7 @@ pip install flask psutil -q
 deactivate
 
 curl -fsSL "$GITHUB_RAW/health/health.py" -o "$BASE/health.py"
+curl -fsSL "$GITHUB_RAW/docs/index.html" -o "$BASE/dashboard.html"
 chmod +x "$BASE/health.py"
 
 sudo tee /etc/systemd/system/nep-health.service > /dev/null <<EOF

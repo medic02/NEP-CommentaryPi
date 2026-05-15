@@ -2,7 +2,7 @@
 # NEP Kommentatorkit – Health API
 # Kjører på port 8080, eksponerer /health
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, redirect
 import socket, time, subprocess, os, json
 import psutil
 
@@ -14,6 +14,7 @@ COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
+DASHBOARD_FILE    = "/home/pi/health/dashboard.html"
 
 DEFAULT_CARD_CONFIG = {
     "logo_pct": 34,
@@ -44,6 +45,14 @@ def get_companion_ip():
 
 app = Flask(__name__)
 START_TIME = int(time.time())
+
+@app.route("/")
+def dashboard():
+    try:
+        with open(DASHBOARD_FILE) as f:
+            return Response(f.read(), mimetype="text/html")
+    except FileNotFoundError:
+        return redirect("/health")
 
 @app.after_request
 def add_cors(response):
