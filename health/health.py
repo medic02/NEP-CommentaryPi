@@ -12,6 +12,7 @@ TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
 COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
+FORCE_MODE_FILE   = "/home/pi/.nep-force-mode"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 DASHBOARD_FILE    = "/home/pi/health/dashboard.html"
@@ -27,6 +28,13 @@ DEFAULT_CARD_CONFIG = {
     "show_local_ip": True,
     "show_name": True,
 }
+
+def get_force_mode():
+    try:
+        m = open(FORCE_MODE_FILE).read().strip()
+        return m if m in ("lan", "ts") else "auto"
+    except Exception:
+        return "auto"
 
 def get_card_config():
     try:
@@ -144,8 +152,22 @@ def health():
         },
         "failover":   failover_state(),
         "failover_enabled": not os.path.exists(FAILOVER_FLAG),
+        "force_mode": get_force_mode(),
         "ts":         int(time.time())
     })
+
+@app.route("/route", methods=["POST"])
+def set_route():
+    mode = request.form.get("mode", "auto")
+    if mode in ("lan", "ts"):
+        with open(FORCE_MODE_FILE, "w") as f:
+            f.write(mode)
+    else:
+        try:
+            os.remove(FORCE_MODE_FILE)
+        except FileNotFoundError:
+            pass
+    return jsonify({"mode": mode if mode in ("lan", "ts") else "auto"})
 
 @app.route("/failover", methods=["GET", "POST"])
 def failover_toggle():

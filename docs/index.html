@@ -117,10 +117,14 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .btn-sm{padding:4px 10px;font-size:.75em}
 .btn-del{border-color:var(--red-dim);color:var(--red)}
 .btn-del:hover{background:var(--red-dim)}
-.btn-fo-on{border-color:var(--green-dim);color:var(--green)}
-.btn-fo-on:hover{background:var(--green-dim)}
-.btn-fo-off{border-color:var(--red-dim);color:var(--red)}
-.btn-fo-off:hover{background:var(--red-dim)}
+.route-btns{display:flex;gap:6px;margin-top:8px}
+.rbtn{flex:1;padding:5px 0;font-size:.73em;font-weight:600;border-radius:6px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+  cursor:pointer;text-align:center;transition:all .15s}
+.rbtn.active-auto{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.rbtn.active-lan{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+.rbtn.active-ts{background:var(--purple-dim);border-color:var(--purple);color:var(--purple)}
+.rbtn:not([class*="active"]):hover{background:var(--border)}
 
 /* ── EMPTY ── */
 .empty-state{grid-column:1/-1;padding:60px 24px;text-align:center;color:var(--muted)}
@@ -232,24 +236,22 @@ function renderManage(){
     </div>`).join('');
 }
 
-// ── FAILOVER TOGGLE ──
-async function toggleFailover(idx, action){
+// ── ROUTE MODE ──
+async function setRouteMode(idx, mode){
   const p=pis[idx];
   const key=JSON.stringify(p);
   const d=live[key];
   const addr=d?._via==='ts'?p.ts:p.lan;
   if(!addr)return;
   try{
-    await fetch(`http://${addr}/failover`,{
+    await fetch(`http://${addr}/route`,{
       method:'POST',
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'action='+action,
+      body:'mode='+mode,
       signal:AbortSignal.timeout(5000)
     });
-    live[key]={...await (async()=>{
-      const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
-      return r.json();
-    })(),_via:d._via};
+    const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
+    live[key]={...await r.json(),_via:d._via};
     render();
   }catch(e){console.error(e);}
 }
@@ -315,6 +317,7 @@ function render(){
     const lanIp=(d.ip_addrs||[]).find(a=>a.iface==='eth0')?.ip||'–';
     const tsIp=(d.ip_addrs||[]).find(a=>a.iface?.startsWith('tailscale'))?.ip||'–';
     const fo=d.failover_enabled;
+    const fm=d.force_mode||'auto';
     const temp=d.cpu_temp_c;
     const tempPct=temp!=null?Math.min(100,Math.max(0,(temp-30)/50*100)):0;
     const tempCol=temp>70?'#ef4444':temp>55?'#f59e0b':'#00d26a';
@@ -348,10 +351,11 @@ function render(){
           <hr class="divider">
           <div class="section">
             <div class="section-label">Failover</div>
-            <div class="kv"><span class="k">Status</span><span class="v ${fo?'green':'red'}">${fo?'Aktiv':'Deaktivert'}</span></div>
             <div class="kv"><span class="k">Feilteljer</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
-            <div style="margin-top:8px">
-              <button class="btn btn-sm ${fo?'btn-fo-off':'btn-fo-on'}" onclick="toggleFailover(${idx},'${fo?'disable':'enable'}')">${fo?'Deaktiver failover':'Aktiver failover'}</button>
+            <div class="route-btns">
+              <button class="rbtn ${fm==='auto'?'active-auto':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
+              <button class="rbtn ${fm==='lan'?'active-lan':''}" onclick="setRouteMode(${idx},'lan')">Tving LAN</button>
+              <button class="rbtn ${fm==='ts'?'active-ts':''}" onclick="setRouteMode(${idx},'ts')">Tving TS</button>
             </div>
           </div>
           <hr class="divider">

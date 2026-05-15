@@ -9,6 +9,7 @@ TS_DEV="${TS_DEV:-tailscale0}"
 LOGTAG="${LOGTAG:-nep-ts-failover}"
 
 FAILOVER_FLAG="/home/pi/.nep-ts-failover-disabled"
+FORCE_MODE_FILE="/home/pi/.nep-force-mode"
 SATELLITE_CONFIG="/home/satellite/satellite-config.json"
 
 FAIL_THRESHOLD="${FAIL_THRESHOLD:-4}"
@@ -26,6 +27,18 @@ if [ -f "$SATELLITE_CONFIG" ]; then
         echo "$_ip" > "$STATE_DIR/companion_ip"
         chmod 644 "$STATE_DIR/companion_ip"
     fi
+fi
+
+# Tvangsruting overstyrer alt annet
+_force="$(cat "$FORCE_MODE_FILE" 2>/dev/null || true)"
+if [ "$_force" = "lan" ]; then
+    clear_ts_route
+    logger -t "$LOGTAG" "Force LAN – rute satt til LAN"
+    exit 0
+elif [ "$_force" = "ts" ]; then
+    force_ts_route
+    logger -t "$LOGTAG" "Force TS – rute satt til Tailscale"
+    exit 0
 fi
 
 # Hopp over hvis failover er deaktivert via webgui
