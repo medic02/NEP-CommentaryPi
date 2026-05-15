@@ -91,7 +91,7 @@ NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H},_m=4;
     context2d.fillText(status,_tx,_y);_y+=(_fz+2);
     context2d.font=_fz+"px sans-serif";
     if(_cfg.show_companion_ip!==false){{context2d.fillStyle="#aaaaaa";context2d.fillText("C:"+_cip,_tx,_y);_y+=_ls;}}
-    if(_cfg.show_conn_fo!==false){{context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";context2d.fillText(_conn+" FO:"+_fo,_tx,_y);_y+=_ls;}}
+    if(_cfg.show_conn_fo!==false){{context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";context2d.fillText(_conn,_tx,_y);const _cw=context2d.measureText(_conn+" ").width;const _foTxt=_fo==="AKT"?"Failover: Aktiv":"Failover: Av";context2d.fillStyle=_fo==="AKT"?"#00cc44":"#ff4444";context2d.fillText(_foTxt,_tx+_cw,_y);_y+=_ls;}}
     if(_cfg.show_local_ip!==false){{context2d.fillStyle="#cccccc";context2d.fillText("IP:"+getIPAddress(),_tx,_y);_y+=_ls;}}
     if(_cfg.show_name!==false){{context2d.fillStyle="#888888";context2d.fillText("{nep_id}",_tx,_y);}}'''
 
