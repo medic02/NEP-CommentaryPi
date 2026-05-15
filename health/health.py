@@ -16,6 +16,7 @@ FORCE_MODE_FILE   = "/run/nep-ts-failover/force_mode"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 DASHBOARD_FILE    = "/home/pi/health/dashboard.html"
+DASHBOARD_CONFIG  = "/home/pi/health/dashboard-config.json"
 
 DEFAULT_CARD_CONFIG = {
     "logo_pct": 34,
@@ -53,6 +54,23 @@ def get_companion_ip():
 
 app = Flask(__name__)
 START_TIME = int(time.time())
+
+@app.route("/config", methods=["GET", "POST"])
+def dashboard_config():
+    if request.method == "POST":
+        try:
+            data = request.get_json(force=True)
+            with open(DASHBOARD_CONFIG, "w") as f:
+                json.dump(data, f)
+            os.chmod(DASHBOARD_CONFIG, 0o644)
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+    try:
+        with open(DASHBOARD_CONFIG) as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify([])
 
 @app.route("/logo.png")
 def logo():

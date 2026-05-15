@@ -368,7 +368,24 @@ let pis = JSON.parse(localStorage.getItem(KEY) || '[]');
 let live = {};
 let editIdx = -1;
 
-function saveToDisk(){ localStorage.setItem(KEY, JSON.stringify(pis)); }
+async function saveToDisk(){
+  localStorage.setItem(KEY, JSON.stringify(pis));
+  try{
+    await fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pis)});
+  }catch{}
+}
+
+async function loadConfig(){
+  try{
+    const r=await fetch('/config',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok)return;
+    const data=await r.json();
+    if(Array.isArray(data)&&data.length>0){
+      pis=data;
+      localStorage.setItem(KEY,JSON.stringify(pis));
+    }
+  }catch{}
+}
 
 // ── MODAL ──
 function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-title').textContent='Legg til Pi'; document.getElementById('modal').classList.add('show'); }
@@ -563,10 +580,9 @@ function render(){
   `;
 }
 
-render();
-if(pis.length)fetchAll();
-setInterval(fetchAll,5000);
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+loadConfig().then(()=>{ render(); if(pis.length)fetchAll(); });
+setInterval(fetchAll,5000);
 </script>
 </body>
 </html>
