@@ -19,6 +19,8 @@ DEFAULT_CARD_CONFIG = {
     "logo_pct": 34,
     "font_size": 9,
     "line_spacing": 9,
+    "text_x": 4,
+    "text_y_offset": 10,
     "show_companion_ip": True,
     "show_conn_fo": True,
     "show_local_ip": True,
@@ -183,9 +185,11 @@ def settings():
     saved = False
     if request.method == "POST":
         cfg = {
-            "logo_pct":        max(15, min(55, int(request.form.get("logo_pct", 34)))),
-            "font_size":       max(7,  min(14, int(request.form.get("font_size", 9)))),
-            "line_spacing":    max(7,  min(14, int(request.form.get("line_spacing", 9)))),
+            "logo_pct":        max(10, min(70, int(request.form.get("logo_pct", 34)))),
+            "font_size":       max(6,  min(20, int(request.form.get("font_size", 9)))),
+            "line_spacing":    max(5,  min(18, int(request.form.get("line_spacing", 9)))),
+            "text_x":          max(0,  min(30, int(request.form.get("text_x", 4)))),
+            "text_y_offset":   max(2,  min(30, int(request.form.get("text_y_offset", 10)))),
             "show_companion_ip": "show_companion_ip" in request.form,
             "show_conn_fo":      "show_conn_fo"      in request.form,
             "show_local_ip":     "show_local_ip"     in request.form,
@@ -237,21 +241,33 @@ button:active{{background:#357acc}}
     <h2>Layout</h2>
     <div class="row">
       <label for="logo_pct">Logostørrelse</label>
-      <input type="range" id="logo_pct" name="logo_pct" min="15" max="55" value="{cfg['logo_pct']}"
+      <input type="range" id="logo_pct" name="logo_pct" min="10" max="70" value="{cfg['logo_pct']}"
              oninput="this.nextElementSibling.textContent=this.value+'%'">
       <span class="val">{cfg['logo_pct']}%</span>
     </div>
     <div class="row">
       <label for="font_size">Skriftstørrelse</label>
-      <input type="range" id="font_size" name="font_size" min="7" max="14" value="{cfg['font_size']}"
+      <input type="range" id="font_size" name="font_size" min="6" max="20" value="{cfg['font_size']}"
              oninput="this.nextElementSibling.textContent=this.value+'px'">
       <span class="val">{cfg['font_size']}px</span>
     </div>
     <div class="row">
       <label for="line_spacing">Linjeavstand</label>
-      <input type="range" id="line_spacing" name="line_spacing" min="7" max="14" value="{cfg['line_spacing']}"
+      <input type="range" id="line_spacing" name="line_spacing" min="5" max="18" value="{cfg['line_spacing']}"
              oninput="this.nextElementSibling.textContent=this.value+'px'">
       <span class="val">{cfg['line_spacing']}px</span>
+    </div>
+    <div class="row">
+      <label for="text_x">Tekst X (venstre)</label>
+      <input type="range" id="text_x" name="text_x" min="0" max="30" value="{cfg.get('text_x', 4)}"
+             oninput="this.nextElementSibling.textContent=this.value+'px'">
+      <span class="val">{cfg.get('text_x', 4)}px</span>
+    </div>
+    <div class="row">
+      <label for="text_y_offset">Tekst Y (fra logo)</label>
+      <input type="range" id="text_y_offset" name="text_y_offset" min="2" max="30" value="{cfg.get('text_y_offset', 10)}"
+             oninput="this.nextElementSibling.textContent=this.value+'px'">
+      <span class="val">{cfg.get('text_y_offset', 10)}px</span>
     </div>
   </div>
   <div class="section">

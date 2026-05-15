@@ -71,7 +71,7 @@ OLD_BASIC = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0
 
 NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H},_m=4;
     let _cip='?',_conn='?',_fo='?';
-    let _cfg={{logo_pct:34,font_size:9,line_spacing:9,show_companion_ip:true,show_conn_fo:true,show_local_ip:true,show_name:true}};
+    let _cfg={{logo_pct:34,font_size:9,line_spacing:9,text_x:4,text_y_offset:10,show_companion_ip:true,show_conn_fo:true,show_local_ip:true,show_name:true}};
     try{{const _fsm=process.getBuiltinModule('fs');const _cp=process.getBuiltinModule('child_process');
     try{{_cip=_fsm.readFileSync('/run/nep-ts-failover/companion_ip','utf8').trim()||'?';}}catch{{}}
     try{{_fo=_fsm.existsSync('/home/pi/.nep-ts-failover-disabled')?'AV':'AKT';}}catch{{}}
@@ -83,16 +83,17 @@ NEW_BASIC = f'''    const _sx={SRC_X},_sy={SRC_Y},_sw={SRC_W},_sh={SRC_H},_m=4;
     const _dw=Math.max(1,Math.floor(_sw*_sc)),_dh=Math.max(1,Math.floor(_sh*_sc));
     context2d.drawImage(iconImage,_sx,_sy,_sw,_sh,Math.floor((width-_dw)/2),Math.floor((_lh-_dh)/2),_dw,_dh);
     const _fz=_cfg.font_size||9;const _ls=_cfg.line_spacing||9;
+    const _tx=_cfg.text_x||4;const _ty=_cfg.text_y_offset||10;
     context2d.textAlign="left";
-    let _y=_lh+10;
+    let _y=_lh+_ty;
     context2d.font="bold "+(_fz+1)+"px sans-serif";
     context2d.fillStyle=status==="Connected"?"#00cc44":"#ff8800";
-    context2d.fillText(status,4,_y);_y+=(_fz+2);
+    context2d.fillText(status,_tx,_y);_y+=(_fz+2);
     context2d.font=_fz+"px sans-serif";
-    if(_cfg.show_companion_ip!==false){{context2d.fillStyle="#aaaaaa";context2d.fillText("C:"+_cip,4,_y);_y+=_ls;}}
-    if(_cfg.show_conn_fo!==false){{context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";context2d.fillText(_conn+" FO:"+_fo,4,_y);_y+=_ls;}}
-    if(_cfg.show_local_ip!==false){{context2d.fillStyle="#cccccc";context2d.fillText("IP:"+getIPAddress(),4,_y);_y+=_ls;}}
-    if(_cfg.show_name!==false){{context2d.fillStyle="#888888";context2d.fillText("{nep_id}",4,_y);}}'''
+    if(_cfg.show_companion_ip!==false){{context2d.fillStyle="#aaaaaa";context2d.fillText("C:"+_cip,_tx,_y);_y+=_ls;}}
+    if(_cfg.show_conn_fo!==false){{context2d.fillStyle=_conn==="LAN"?"#55bbff":_conn==="TS"?"#ffaa00":"#888888";context2d.fillText(_conn+" FO:"+_fo,_tx,_y);_y+=_ls;}}
+    if(_cfg.show_local_ip!==false){{context2d.fillStyle="#cccccc";context2d.fillText("IP:"+getIPAddress(),_tx,_y);_y+=_ls;}}
+    if(_cfg.show_name!==false){{context2d.fillStyle="#888888";context2d.fillText("{nep_id}",_tx,_y);}}'''
 
 OLD_LOGO = '''    const iconTargetSize = Math.round(Math.min(width, height) * 0.8);
     const iconTargetX = (width - iconTargetSize) / 2;
