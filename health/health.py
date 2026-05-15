@@ -12,7 +12,7 @@ TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
 COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
-FORCE_MODE_FILE   = "/home/pi/.nep-force-mode"
+FORCE_MODE_FILE   = "/run/nep-ts-failover/force_mode"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 DASHBOARD_FILE    = "/home/pi/health/dashboard.html"

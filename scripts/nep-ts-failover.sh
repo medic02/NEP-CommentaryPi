@@ -9,7 +9,7 @@ TS_DEV="${TS_DEV:-tailscale0}"
 LOGTAG="${LOGTAG:-nep-ts-failover}"
 
 FAILOVER_FLAG="/home/pi/.nep-ts-failover-disabled"
-FORCE_MODE_FILE="/home/pi/.nep-force-mode"
+FORCE_MODE_FILE="$STATE_DIR/force_mode"
 SATELLITE_CONFIG="/home/satellite/satellite-config.json"
 
 FAIL_THRESHOLD="${FAIL_THRESHOLD:-4}"
@@ -18,6 +18,7 @@ SETTLE_SECONDS="${SETTLE_SECONDS:-15}"
 
 STATE_DIR="/run/nep-ts-failover"
 mkdir -p "$STATE_DIR"
+chmod a+w "$STATE_DIR"
 
 # Les Companion IP fra satellite sin config hvis tilgjengelig
 if [ -f "$SATELLITE_CONFIG" ]; then
