@@ -553,7 +553,7 @@ function render(){
           <hr class="divider">
           <div class="section">
             <div class="section-label">Failover</div>
-            <div class="kv"><span class="k">Feilteljer</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
+            <div class="kv"><span class="k">Feilteller</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
             <div class="route-toggle">
               <button class="rtbtn ${fm==='auto'?'active-auto':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
               <button class="rtbtn ${fm==='lan'?'active-lan':''}" onclick="setRouteMode(${idx},'lan')">LAN</button>
