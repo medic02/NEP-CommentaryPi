@@ -128,7 +128,17 @@ if OLD_BASIC in src:
     print('  generateBasicCard: patchet')
     changed = True
 elif f'_sx={SRC_X}' in src:
-    print('  generateBasicCard: allerede patchet')
+    # nep-original inneholder gammel NEP-patch – erstatt med ny versjon
+    old_nep = re.search(
+        r'    const _sx=' + str(SRC_X) + r',_sy=' + str(SRC_Y) + r',.*?fillText\("[^"]*",4,_y\);',
+        src, re.DOTALL
+    )
+    if old_nep:
+        src = src[:old_nep.start()] + NEW_BASIC + src[old_nep.end():]
+        print('  generateBasicCard: oppdatert fra gammel NEP-patch')
+        changed = True
+    else:
+        print('  ADVARSEL: generateBasicCard (gammel NEP-patch) ikke funnet')
 else:
     print('  ADVARSEL: generateBasicCard ikke funnet')
 
