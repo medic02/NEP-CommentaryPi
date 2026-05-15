@@ -5,194 +5,344 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NEP Satellite Dashboard</title>
 <style>
+:root{
+  --bg:#080c10;--surface:#0e1520;--surface2:#131d2b;--border:#1a2535;
+  --green:#00d26a;--green-dim:#0a3320;--orange:#f59e0b;--orange-dim:#2d1f04;
+  --red:#ef4444;--red-dim:#2d0f0f;--blue:#38bdf8;--blue-dim:#062030;
+  --purple:#818cf8;--purple-dim:#15133a;--text:#e2e8f0;--muted:#4a5568;
+  --mono:'SF Mono','Fira Mono','Consolas',monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;min-height:100vh;padding:20px}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-h1{font-size:1.3em;color:#e6edf3}
-.header-right{display:flex;align-items:center;gap:12px}
-.updated{font-size:.8em;color:#555}
-#refresh-dot{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;margin-right:6px;transition:background .2s}
-#refresh-dot.active{background:#00cc44}
-button{background:#1c2333;border:1px solid #30363d;color:#e6edf3;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.85em}
-button:hover{background:#21262d}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;transition:border-color .3s}
-.card.ok{border-color:#238636}
-.card.warn{border-color:#9e6a03}
-.card.offline{border-color:#6e3535;opacity:.7}
-.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.card-name{font-weight:700;font-size:1em}
-.badge{font-size:.7em;padding:3px 8px;border-radius:12px;font-weight:600;white-space:nowrap}
-.badge-ok{background:#1a4731;color:#3fb950}
-.badge-ts{background:#3d2e00;color:#d29922}
-.badge-offline{background:#3d1f1f;color:#f85149}
-.badge-conn{background:#0d2d4a;color:#58a6ff}
-.rows{display:flex;flex-direction:column;gap:7px}
-.row{display:flex;justify-content:space-between;align-items:center;font-size:.85em}
-.row .lbl{color:#8b949e}
-.row .val{color:#e6edf3;text-align:right}
-.val.green{color:#3fb950}
-.val.red{color:#f85149}
-.val.orange{color:#d29922}
-.val.blue{color:#58a6ff}
-.divider{border:none;border-top:1px solid #21262d;margin:8px 0}
-.add-section{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
-.add-section input{background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:8px 12px;border-radius:6px;font-size:.9em;flex:1;min-width:200px}
-.add-section input::placeholder{color:#555}
-.pi-list{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
-.pi-tag{background:#1c2333;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:.8em;display:flex;align-items:center;gap:8px}
-.pi-tag .rm{cursor:pointer;color:#8b949e;font-size:1.1em;line-height:1}
-.pi-tag .rm:hover{color:#f85149}
-.empty{color:#555;font-size:.9em;grid-column:1/-1;padding:40px;text-align:center}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo svg{opacity:.9}
+.logo-text{font-size:1em;font-weight:700;letter-spacing:.5px;color:var(--text)}
+.logo-sub{font-size:.7em;color:var(--muted);font-weight:400;margin-left:4px}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.summary{display:flex;gap:16px}
+.sum-item{display:flex;align-items:center;gap:6px;font-size:.8em;color:var(--muted)}
+.sum-dot{width:7px;height:7px;border-radius:50%}
+.btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:7px 14px;border-radius:7px;cursor:pointer;font-size:.82em;
+  display:flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--border);border-color:#243040}
+.refresh-ring{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);
+  border-top-color:var(--green);display:inline-block;transition:opacity .3s}
+.refresh-ring.spin{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── GRID ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+  gap:16px;padding:24px}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .3s}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.card.ok{border-color:#1a3a2a}
+.card.ts{border-color:#2a2060}
+.card.offline{border-color:#2a1515;opacity:.6}
+
+.card-top{padding:14px 16px 12px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between}
+.card-id{display:flex;align-items:center;gap:10px}
+.status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.status-dot.online{background:var(--green);box-shadow:0 0 8px var(--green);
+  animation:pulse-green 2s ease-in-out infinite}
+.status-dot.ts-mode{background:var(--purple);box-shadow:0 0 8px var(--purple);
+  animation:pulse-purple 2s ease-in-out infinite}
+.status-dot.offline{background:var(--red)}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 4px var(--green)}50%{box-shadow:0 0 12px var(--green)}}
+@keyframes pulse-purple{0%,100%{box-shadow:0 0 4px var(--purple)}50%{box-shadow:0 0 12px var(--purple)}}
+.card-name{font-weight:700;font-size:.95em}
+.card-host{font-size:.72em;color:var(--muted);font-family:var(--mono)}
+.conn-badge{font-size:.68em;font-weight:700;padding:3px 9px;border-radius:10px;
+  letter-spacing:.3px;white-space:nowrap}
+.cb-lan{background:var(--blue-dim);color:var(--blue)}
+.cb-ts{background:var(--purple-dim);color:var(--purple)}
+.cb-off{background:var(--red-dim);color:var(--red)}
+
+.card-body{padding:14px 16px}
+.section{margin-bottom:12px}
+.section:last-child{margin-bottom:0}
+.section-label{font-size:.65em;font-weight:700;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--muted);margin-bottom:6px}
+.kv{display:flex;justify-content:space-between;align-items:center;
+  padding:3px 0;font-size:.83em}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:var(--mono);font-size:.92em;text-align:right}
+.v.green{color:var(--green)}.v.red{color:var(--red)}.v.orange{color:var(--orange)}
+.v.blue{color:var(--blue)}.v.purple{color:var(--purple)}.v.muted{color:var(--muted)}
+.divider{border:none;border-top:1px solid var(--border);margin:10px 0}
+
+.temp-bar{height:3px;border-radius:2px;margin-top:4px;transition:width .5s}
+
+/* ── ADD PI MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:440px;padding:24px;animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h2{font-size:1em;margin-bottom:20px;color:var(--text)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.8em;color:var(--muted);margin-bottom:5px}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);padding:9px 12px;border-radius:7px;font-size:.9em;font-family:var(--mono);
+  transition:border-color .15s}
+.field input:focus{outline:none;border-color:#2d4060}
+.field input::placeholder{color:var(--muted);font-family:system-ui,sans-serif}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions .btn-primary{flex:1;background:var(--blue-dim);border-color:#1a4060;
+  color:var(--blue);font-weight:600;justify-content:center;padding:10px}
+.modal-actions .btn-primary:hover{background:#0a2d45}
+.modal-actions .btn-cancel{color:var(--muted)}
+
+/* ── PI LIST ── */
+.pi-manage{padding:0 24px 24px}
+.pi-manage h3{font-size:.75em;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);margin-bottom:12px}
+.pi-rows{display:flex;flex-direction:column;gap:8px}
+.pi-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.pi-row-info{display:flex;flex-direction:column;gap:3px}
+.pi-row-name{font-size:.88em;font-weight:600}
+.pi-row-ips{font-size:.73em;color:var(--muted);font-family:var(--mono)}
+.pi-row-actions{display:flex;gap:6px}
+.btn-sm{padding:4px 10px;font-size:.75em}
+.btn-del{border-color:var(--red-dim);color:var(--red)}
+.btn-del:hover{background:var(--red-dim)}
+
+/* ── EMPTY ── */
+.empty-state{grid-column:1/-1;padding:60px 24px;text-align:center;color:var(--muted)}
+.empty-state .icon{font-size:3em;margin-bottom:16px;opacity:.3}
+.empty-state p{font-size:.9em;margin-bottom:20px}
+.empty-state .btn{margin:0 auto;width:fit-content}
+
+.ts-indicator{font-size:.7em;color:var(--muted);margin-top:2px}
+.ts-indicator.via-ts{color:var(--purple)}
+.ts-indicator.via-lan{color:var(--green)}
 </style>
 </head>
 <body>
-<header>
-  <h1>NEP Satellite Dashboard</h1>
-  <div class="header-right">
-    <span class="updated"><span id="refresh-dot"></span><span id="updated-txt">–</span></span>
-    <button onclick="openConfig()">+ Legg til Pi</button>
+
+<div class="topbar">
+  <div class="logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="2" width="9" height="9" rx="2" fill="#38bdf8" opacity=".8"/>
+      <rect x="13" y="2" width="9" height="9" rx="2" fill="#38bdf8" opacity=".5"/>
+      <rect x="2" y="13" width="9" height="9" rx="2" fill="#38bdf8" opacity=".5"/>
+      <rect x="13" y="13" width="9" height="9" rx="2" fill="#38bdf8" opacity=".3"/>
+    </svg>
+    <span class="logo-text">NEP Satellite<span class="logo-sub">Dashboard</span></span>
   </div>
-</header>
+  <div class="topbar-right">
+    <div class="summary" id="summary"></div>
+    <span id="refresh-ring" class="refresh-ring"></span>
+    <button class="btn" onclick="openAdd()">＋ Legg til Pi</button>
+    <button class="btn" onclick="toggleManage()" id="manage-btn">Administrer</button>
+  </div>
+</div>
 
 <div class="grid" id="grid"></div>
+<div class="pi-manage" id="pi-manage" style="display:none">
+  <h3>Konfigurerte Pi-er</h3>
+  <div class="pi-rows" id="pi-rows"></div>
+</div>
 
-<div id="config-section" style="display:none;margin-top:24px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px">
-  <h2 style="font-size:.9em;color:#8b949e;margin-bottom:12px;text-transform:uppercase">Pi-adresser (IP:port)</h2>
-  <div class="add-section">
-    <input id="pi-input" type="text" placeholder="192.168.8.104:8080 eller 100.x.x.x:8080">
-    <button onclick="addPi()">Legg til</button>
+<!-- Modal -->
+<div class="modal-bg" id="modal" onclick="e=>e.target===this&&closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2 id="modal-title">Legg til Pi</h2>
+    <div class="field">
+      <label>Navn (valgfritt)</label>
+      <input id="f-name" type="text" placeholder="Satellite Pi 1">
+    </div>
+    <div class="field">
+      <label>LAN IP:port</label>
+      <input id="f-lan" type="text" placeholder="192.168.8.104:8080">
+    </div>
+    <div class="field">
+      <label>Tailscale IP:port</label>
+      <input id="f-ts" type="text" placeholder="100.x.x.x:8080">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-primary" onclick="savePi()">Lagre</button>
+    </div>
   </div>
-  <div class="pi-list" id="pi-list"></div>
 </div>
 
 <script>
-const STORAGE_KEY = 'nep_dashboard_pis';
-let pis = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-let data = {};
-let interval;
+const KEY = 'nep_pis_v2';
+let pis = JSON.parse(localStorage.getItem(KEY) || '[]');
+let live = {};
+let editIdx = -1;
 
-function savePis() { localStorage.setItem(STORAGE_KEY, JSON.stringify(pis)); }
+function saveToDisk(){ localStorage.setItem(KEY, JSON.stringify(pis)); }
 
-function openConfig() {
-  const s = document.getElementById('config-section');
-  s.style.display = s.style.display === 'none' ? 'block' : 'none';
-  renderPiList();
+// ── MODAL ──
+function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-title').textContent='Legg til Pi'; document.getElementById('modal').classList.add('show'); }
+function openEdit(i){ editIdx=i; const p=pis[i]; document.getElementById('f-name').value=p.name||''; document.getElementById('f-lan').value=p.lan||''; document.getElementById('f-ts').value=p.ts||''; document.getElementById('modal-title').textContent='Rediger Pi'; document.getElementById('modal').classList.add('show'); }
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+function clearForm(){ ['f-name','f-lan','f-ts'].forEach(id=>document.getElementById(id).value=''); }
+function savePi(){
+  const name=document.getElementById('f-name').value.trim();
+  const lan=document.getElementById('f-lan').value.trim();
+  const ts=document.getElementById('f-ts').value.trim();
+  if(!lan&&!ts)return;
+  const obj={name,lan,ts};
+  if(editIdx>=0) pis[editIdx]=obj; else pis.push(obj);
+  saveToDisk(); closeModal(); renderManage(); fetchAll();
+}
+function deletePi(i){ pis.splice(i,1); saveToDisk(); renderManage(); render(); }
+function toggleManage(){
+  const el=document.getElementById('pi-manage');
+  const btn=document.getElementById('manage-btn');
+  const show=el.style.display==='none';
+  el.style.display=show?'block':'none';
+  btn.textContent=show?'Ferdig':'Administrer';
+  if(show)renderManage();
+}
+function renderManage(){
+  document.getElementById('pi-rows').innerHTML=pis.map((p,i)=>`
+    <div class="pi-row">
+      <div class="pi-row-info">
+        <span class="pi-row-name">${p.name||'Pi #'+(i+1)}</span>
+        <span class="pi-row-ips">${[p.lan&&'LAN: '+p.lan,p.ts&&'TS: '+p.ts].filter(Boolean).join(' · ')}</span>
+      </div>
+      <div class="pi-row-actions">
+        <button class="btn btn-sm" onclick="openEdit(${i})">Rediger</button>
+        <button class="btn btn-sm btn-del" onclick="deletePi(${i})">Slett</button>
+      </div>
+    </div>`).join('');
 }
 
-function renderPiList() {
-  const el = document.getElementById('pi-list');
-  el.innerHTML = pis.map((p,i) =>
-    `<div class="pi-tag">${p}<span class="rm" onclick="removePi(${i})">×</span></div>`
-  ).join('');
+// ── FETCH ──
+async function fetchOne(addr,timeout=4000){
+  const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(timeout)});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
 }
-
-function addPi() {
-  const v = document.getElementById('pi-input').value.trim();
-  if (!v || pis.includes(v)) return;
-  pis.push(v);
-  savePis();
-  document.getElementById('pi-input').value = '';
-  renderPiList();
-  fetchAll();
+async function fetchPi(p){
+  const key=JSON.stringify(p);
+  // Try LAN first (2s), then Tailscale
+  if(p.lan){
+    try{ live[key]={...await fetchOne(p.lan,2000),_via:'lan'}; return; }catch{}
+  }
+  if(p.ts){
+    try{ live[key]={...await fetchOne(p.ts,4000),_via:'ts'}; return; }catch{}
+  }
+  live[key]=null;
 }
-
-function removePi(i) {
-  pis.splice(i, 1);
-  savePis();
-  delete data[pis[i]];
-  renderPiList();
+async function fetchAll(){
+  const ring=document.getElementById('refresh-ring');
+  ring.classList.add('spin');
+  await Promise.all(pis.map(fetchPi));
   render();
+  ring.classList.remove('spin');
 }
 
-function fmt_uptime(s) {
-  if (s < 60) return s + 's';
-  if (s < 3600) return Math.floor(s/60) + 'm';
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
-  return h + 'h ' + m + 'm';
+// ── RENDER ──
+function uptime(s){
+  if(s<60)return s+'s';
+  if(s<3600)return Math.floor(s/60)+'m';
+  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
 }
+function tempColor(t){ return t==null?'muted':t>70?'red':t>55?'orange':'green'; }
 
-function render() {
-  const grid = document.getElementById('grid');
-  if (pis.length === 0) {
-    grid.innerHTML = '<div class="empty">Ingen Pi-er lagt til ennå.<br>Trykk "+ Legg til Pi" og skriv inn IP:port</div>';
+function render(){
+  const grid=document.getElementById('grid');
+  if(!pis.length){
+    grid.innerHTML=`<div class="empty-state"><div class="icon">📡</div><p>Ingen Pi-er lagt til ennå</p><button class="btn" onclick="openAdd()">＋ Legg til første Pi</button></div>`;
+    document.getElementById('summary').innerHTML='';
     return;
   }
-
-  grid.innerHTML = pis.map(addr => {
-    const d = data[addr];
-    if (!d) return `
+  let online=0,tsCount=0;
+  grid.innerHTML=pis.map(p=>{
+    const key=JSON.stringify(p);
+    const d=live[key];
+    const name=p.name||(d?.id)||'Pi';
+    if(!d) return `
       <div class="card offline">
-        <div class="card-header">
-          <span class="card-name">${addr}</span>
-          <span class="badge badge-offline">OFFLINE</span>
+        <div class="card-top">
+          <div class="card-id"><div class="status-dot offline"></div><div><div class="card-name">${name}</div><div class="card-host">${p.lan||p.ts||'–'}</div></div></div>
+          <span class="conn-badge cb-off">OFFLINE</span>
         </div>
-        <div class="rows"><div class="row"><span class="lbl">Ingen kontakt</span></div></div>
+        <div class="card-body"><div class="kv"><span class="k">Ingen kontakt</span><span class="v muted">–</span></div></div>
       </div>`;
-
-    const using = d.companion?.using || '?';
-    const lanOk = d.companion?.lan_ok;
-    const foEnabled = d.failover_enabled;
-    const failCount = d.failover?.fail_count || 0;
-    const isTs = using === 'tailscale';
-    const cardClass = isTs ? 'warn' : 'ok';
-    const connBadge = isTs
-      ? '<span class="badge badge-ts">TAILSCALE</span>'
-      : '<span class="badge badge-conn">LAN</span>';
-
-    const lanIp = (d.ip_addrs||[]).find(a => a.iface === 'eth0')?.ip || '–';
-    const tsIp  = (d.ip_addrs||[]).find(a => a.iface?.startsWith('tailscale'))?.ip || '–';
-    const temp  = d.cpu_temp_c != null ? d.cpu_temp_c + '°C' : '–';
-    const tempColor = d.cpu_temp_c > 70 ? 'red' : d.cpu_temp_c > 55 ? 'orange' : 'green';
-
+    online++;
+    const using=d.companion?.using||'?';
+    const isTs=using==='tailscale';
+    if(isTs)tsCount++;
+    const viaTs=d._via==='ts';
+    const lanIp=(d.ip_addrs||[]).find(a=>a.iface==='eth0')?.ip||'–';
+    const tsIp=(d.ip_addrs||[]).find(a=>a.iface?.startsWith('tailscale'))?.ip||'–';
+    const fo=d.failover_enabled;
+    const temp=d.cpu_temp_c;
+    const tempPct=temp!=null?Math.min(100,Math.max(0,(temp-30)/50*100)):0;
+    const tempCol=temp>70?'#ef4444':temp>55?'#f59e0b':'#00d26a';
+    const cardClass=isTs?'ts':'ok';
+    const dotClass=isTs?'ts-mode':'online';
+    const badge=isTs?'<span class="conn-badge cb-ts">TAILSCALE</span>':'<span class="conn-badge cb-lan">LAN</span>';
     return `
       <div class="card ${cardClass}">
-        <div class="card-header">
-          <span class="card-name">${d.id || addr}</span>
-          ${connBadge}
+        <div class="card-top">
+          <div class="card-id">
+            <div class="status-dot ${dotClass}"></div>
+            <div>
+              <div class="card-name">${d.id||name}</div>
+              <div class="card-host">${d.hostname||'–'} <span class="ts-indicator ${viaTs?'via-ts':'via-lan'}">${viaTs?'via TS':'via LAN'}</span></div>
+            </div>
+          </div>
+          ${badge}
         </div>
-        <div class="rows">
-          <div class="row"><span class="lbl">Hostname</span><span class="val">${d.hostname||'–'}</span></div>
-          <div class="row"><span class="lbl">LAN IP</span><span class="val">${lanIp}</span></div>
-          <div class="row"><span class="lbl">Tailscale IP</span><span class="val">${tsIp}</span></div>
-          <div class="row"><span class="lbl">Uptime</span><span class="val">${fmt_uptime(d.uptime_sec||0)}</span></div>
+        <div class="card-body">
+          <div class="section">
+            <div class="section-label">Companion</div>
+            <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
+            <div class="kv"><span class="k">Tilkobling</span><span class="v ${isTs?'purple':'blue'}">${isTs?'Tailscale':'LAN'}</span></div>
+            <div class="kv"><span class="k">LAN tilgjengelig</span><span class="v ${d.companion?.lan_ok?'green':'red'}">${d.companion?.lan_ok?'Ja':'Nei'}</span></div>
+          </div>
           <hr class="divider">
-          <div class="row"><span class="lbl">Companion</span><span class="val">${d.companion?.ip||'–'}:${d.companion?.port||'–'}</span></div>
-          <div class="row"><span class="lbl">Tilkobling</span><span class="val ${isTs?'orange':'blue'}">${isTs?'Tailscale':'LAN'}</span></div>
-          <div class="row"><span class="lbl">LAN tilgjengelig</span><span class="val ${lanOk?'green':'red'}">${lanOk?'Ja':'Nei'}</span></div>
-          <div class="row"><span class="lbl">Failover</span><span class="val ${foEnabled?'green':'red'}">${foEnabled?'Aktiv':'Deaktivert'}</span></div>
-          <div class="row"><span class="lbl">Feilteljer</span><span class="val ${failCount>0?'orange':''}">${failCount}</span></div>
+          <div class="section">
+            <div class="section-label">Nettverk</div>
+            <div class="kv"><span class="k">LAN</span><span class="v">${lanIp}</span></div>
+            <div class="kv"><span class="k">Tailscale</span><span class="v">${tsIp}</span></div>
+          </div>
           <hr class="divider">
-          <div class="row"><span class="lbl">CPU-temp</span><span class="val ${tempColor}">${temp}</span></div>
+          <div class="section">
+            <div class="section-label">Failover</div>
+            <div class="kv"><span class="k">Status</span><span class="v ${fo?'green':'red'}">${fo?'Aktiv':'Deaktivert'}</span></div>
+            <div class="kv"><span class="k">Feilteljer</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
+          </div>
+          <hr class="divider">
+          <div class="section">
+            <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
+            ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
+            <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
+          </div>
         </div>
       </div>`;
   }).join('');
+  // Summary
+  const total=pis.length;
+  document.getElementById('summary').innerHTML=`
+    <div class="sum-item"><div class="sum-dot" style="background:var(--green)"></div>${online} online</div>
+    ${tsCount?`<div class="sum-item"><div class="sum-dot" style="background:var(--purple)"></div>${tsCount} via TS</div>`:''}
+    ${total-online?`<div class="sum-item"><div class="sum-dot" style="background:var(--red)"></div>${total-online} offline</div>`:''}
+  `;
 }
 
-async function fetchPi(addr) {
-  try {
-    const r = await fetch(`http://${addr}/health`, {signal: AbortSignal.timeout(4000)});
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    data[addr] = await r.json();
-  } catch {
-    data[addr] = null;
-  }
-}
-
-async function fetchAll() {
-  const dot = document.getElementById('refresh-dot');
-  dot.classList.add('active');
-  await Promise.all(pis.map(fetchPi));
-  render();
-  dot.classList.remove('active');
-  document.getElementById('updated-txt').textContent =
-    'Oppdatert ' + new Date().toLocaleTimeString('no');
-}
-
-renderPiList();
 render();
-if (pis.length) fetchAll();
-interval = setInterval(fetchAll, 5000);
+if(pis.length)fetchAll();
+setInterval(fetchAll,5000);
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 </script>
 </body>
 </html>
