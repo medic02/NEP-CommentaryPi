@@ -31,6 +31,17 @@ DEFAULT_CARD_CONFIG = {
     "show_name": True,
 }
 
+def _service_active(name):
+    try:
+        r = subprocess.run(
+            ["systemctl", "is-active", f"{name}.service"],
+            capture_output=True, timeout=2
+        )
+        return r.stdout.decode().strip() == "active"
+    except Exception:
+        return False
+
+
 def get_force_mode():
     try:
         m = open(FORCE_MODE_FILE).read().strip()
@@ -181,6 +192,7 @@ def health():
         "force_mode": get_force_mode(),
         "ts":         int(time.time()),
         "version":    VERSION,
+        "watchdog":   _service_active("nep-satellite-watchdog"),
     })
 
 @app.route("/route", methods=["POST"])

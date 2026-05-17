@@ -800,6 +800,7 @@ function render(){
             ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
             <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
             ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
+            <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
             ${sshIp ? `<a class="ssh-btn" href="ssh://pi@${sshIp}">⌨ SSH inn</a>` : ''}
           </div>
         </div>
