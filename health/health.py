@@ -366,15 +366,16 @@ button:active{{background:#357acc}}
 
 @app.route("/update", methods=["POST"])
 def trigger_update():
-    import threading
-    def run():
-        time.sleep(0.5)
-        subprocess.run(
-            ["bash", "-c",
-             "curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash"],
-            capture_output=True
-        )
-    threading.Thread(target=run, daemon=True).start()
+    # start_new_session=True løsriver prosessen fra cgroupa til nep-health
+    # slik at den overlever når systemd dreper nep-health under restart
+    subprocess.Popen(
+        ["bash", "-c",
+         "sleep 1 && curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash"],
+        start_new_session=True,
+        stdout=open("/tmp/nep-update.log", "w"),
+        stderr=subprocess.STDOUT,
+        close_fds=True
+    )
     return jsonify({"ok": True, "version": VERSION})
 
 
