@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request, Response, redirect, send_file
 import socket, time, subprocess, os, json, re
 import psutil
 
+VERSION       = "2026.05.17"
 APP_ID        = os.environ.get("NEP_ID", "Satellite Pi")
 LAN_DEV       = os.environ.get("LAN_DEV", "eth0")
 TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
@@ -178,7 +179,8 @@ def health():
         "failover":   failover_state(),
         "failover_enabled": not os.path.exists(FAILOVER_FLAG),
         "force_mode": get_force_mode(),
-        "ts":         int(time.time())
+        "ts":         int(time.time()),
+        "version":    VERSION,
     })
 
 @app.route("/route", methods=["POST"])
@@ -348,6 +350,20 @@ button:active{{background:#357acc}}
 <div class="nav"><a href="/failover">← Failover</a></div>
 </body></html>"""
     return Response(html, mimetype="text/html")
+
+
+@app.route("/update", methods=["POST"])
+def trigger_update():
+    import threading
+    def run():
+        time.sleep(0.5)
+        subprocess.run(
+            ["bash", "-c",
+             "curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash"],
+            capture_output=True
+        )
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"ok": True, "version": VERSION})
 
 
 @app.route("/ping")

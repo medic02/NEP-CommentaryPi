@@ -338,6 +338,17 @@ body{
 .type-btn:hover{background:rgba(255,255,255,0.07);color:var(--text)}
 .type-btn.active{background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.35);color:var(--blue)}
 
+/* ── UPDATE MODAL ── */
+.upd-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;max-height:60vh;overflow-y:auto}
+.upd-row{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.upd-name{font-size:.85em;font-weight:600}
+.upd-ver{font-size:.68em;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.upd-state{font-size:.75em;font-weight:600;white-space:nowrap;flex-shrink:0}
+.upd-state.wait{color:var(--muted)}
+.upd-state.doing{color:var(--orange)}
+.upd-state.done{color:var(--green)}
+.upd-state.err{color:var(--red)}
+
 /* ── DEVICE CARD (ping-only) ── */
 .dcard{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -378,6 +389,7 @@ body{
     <span id="refresh-ring" class="refresh-ring"></span>
     <button class="btn" onclick="openAdd()">＋ Legg til Pi</button>
     <button class="btn" onclick="toggleManage()" id="manage-btn">Administrer</button>
+    <button class="btn" onclick="openUpdate()">⬆ Oppdater alle</button>
     <button class="btn" onclick="openCmds()">⌨ Kommandoer</button>
   </div>
 </div>
@@ -449,10 +461,7 @@ body{
 
     <div class="cmd-section">
       <div class="cmd-section-title">🔄 Oppdatering</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Health API + Dashboard</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/health/health.py -o /home/pi/health/health.py
-curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/docs/index.html -o /home/pi/health/dashboard.html
-curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/assets/nep-logo.png -o /home/pi/health/nep-logo.png
-sudo systemctl restart nep-health</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Pi (health, dashboard, watchdog)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Failover-script</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-ts-failover.sh | sudo tee /usr/local/sbin/nep-ts-failover.sh > /dev/null</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Stream Deck-patch</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/patch-satellite.py -o /tmp/patch-satellite.py && sudo python3 /tmp/patch-satellite.py</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
     </div>
@@ -476,6 +485,18 @@ sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><bu
 
     <div class="modal-actions" style="margin-top:20px">
       <button class="btn" onclick="closeCmds()" style="flex:1;justify-content:center">Lukk</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── UPDATE MODAL ── -->
+<div class="modal-bg" id="upd-modal" onclick="if(event.target===this)closeUpdate()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+    <h2>Oppdater Pi-er</h2>
+    <div class="upd-list" id="upd-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeUpdate()">Lukk</button>
+      <button class="btn btn-primary" id="upd-start-btn" onclick="runUpdate()">⬆ Start oppdatering</button>
     </div>
   </div>
 </div>
@@ -778,6 +799,7 @@ function render(){
             <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
             ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
             <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
+            ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
             ${sshIp ? `<a class="ssh-btn" href="ssh://pi@${sshIp}">⌨ SSH inn</a>` : ''}
           </div>
         </div>
@@ -790,6 +812,66 @@ function render(){
     ${tsCount?`<div class="sum-item"><div class="sum-dot" style="background:var(--purple)"></div>${tsCount} via TS</div>`:''}
     ${total-online?`<div class="sum-item"><div class="sum-dot" style="background:var(--red)"></div>${total-online} offline</div>`:''}
   `;
+}
+
+// ── UPDATE ALL ──
+function openUpdate(){
+  const targets=pis.filter(p=>!p.type||p.type==='pi');
+  if(!targets.length){ alert('Ingen Pi-er konfigurert.'); return; }
+  document.getElementById('upd-list').innerHTML=targets.map((p,i)=>{
+    const key=JSON.stringify(p);
+    const d=live[key];
+    const ver=d?.version||'–';
+    const addr=getAddr(p);
+    return `<div class="upd-row" id="upd-row-${i}">
+      <div>
+        <div class="upd-name">${p.name||d?.id||'Pi #'+(i+1)}</div>
+        <div class="upd-ver">v${ver} · ${addr||'ikke tilgjengelig'}</div>
+      </div>
+      <div class="upd-state wait" id="upd-state-${i}">${addr?'Klar':'Offline'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('upd-start-btn').disabled=false;
+  document.getElementById('upd-start-btn').textContent='⬆ Start oppdatering';
+  document.getElementById('upd-modal').classList.add('show');
+}
+function closeUpdate(){ document.getElementById('upd-modal').classList.remove('show'); }
+function getAddr(p){
+  const key=JSON.stringify(p);
+  const d=live[key];
+  if(!d)return p.lan||p.ts||null;
+  return d._via==='ts'?p.ts:p.lan||p.ts||null;
+}
+async function runUpdate(){
+  const btn=document.getElementById('upd-start-btn');
+  btn.disabled=true; btn.textContent='Oppdaterer...';
+  const targets=pis.filter(p=>!p.type||p.type==='pi');
+  await Promise.all(targets.map(async(p,i)=>{
+    const setState=(s,cls)=>{
+      const el=document.getElementById(`upd-state-${i}`);
+      if(el){el.textContent=s;el.className='upd-state '+cls;}
+    };
+    const addr=getAddr(p);
+    if(!addr){ setState('Offline','err'); return; }
+    setState('Sender...','doing');
+    try{
+      await fetch(`http://${addr}/update`,{method:'POST',signal:AbortSignal.timeout(5000)});
+      setState('Oppdaterer…','doing');
+      // Vent på at tjenesten restartes (~15s), poll til online
+      await new Promise(r=>setTimeout(r,5000));
+      let ok=false;
+      for(let t=0;t<12;t++){
+        await new Promise(r=>setTimeout(r,2000));
+        try{
+          const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(3000)});
+          if(r.ok){ ok=true; break; }
+        }catch{}
+      }
+      if(ok){ setState('✓ Ferdig','done'); }
+      else   { setState('✗ Timeout','err'); }
+    }catch(e){ setState('✗ Feil','err'); }
+  }));
+  btn.textContent='Ferdig'; fetchAll();
 }
 
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});

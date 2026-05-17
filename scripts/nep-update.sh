@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# NEP trygg oppdatering
+# Oppdaterer: health.py, dashboard, watchdog, failover-script
+# Rører IKKE: Tailscale, satellite, satellite-config.json, nettverksregler, systemd-units
+
+set -euo pipefail
+GITHUB_RAW="https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main"
+BASE="/home/pi/health"
+LOG(){ logger -t nep-update "$*"; echo "$*"; }
+
+LOG "Starter oppdatering..."
+
+# ── Health API + dashboard ──────────────────────────────────────────────────
+curl -fsSL "$GITHUB_RAW/health/health.py"     -o "$BASE/health.py"
+curl -fsSL "$GITHUB_RAW/docs/index.html"      -o "$BASE/dashboard.html"
+curl -fsSL "$GITHUB_RAW/assets/nep-logo.png"  -o "$BASE/nep-logo.png" 2>/dev/null || true
+chmod +x "$BASE/health.py"
+LOG "health.py + dashboard oppdatert"
+
+# ── Satellite watchdog (kun hvis installert) ────────────────────────────────
+if [ -f /usr/local/sbin/nep-satellite-watchdog.sh ]; then
+    curl -fsSL "$GITHUB_RAW/scripts/nep-satellite-watchdog.sh" \
+        -o /tmp/nep-satellite-watchdog.sh
+    sudo install -m 755 /tmp/nep-satellite-watchdog.sh \
+        /usr/local/sbin/nep-satellite-watchdog.sh
+    LOG "nep-satellite-watchdog.sh oppdatert"
+fi
+
+# ── Failover script (kun hvis installert) ───────────────────────────────────
+# Rører IKKE Tailscale-konfig, ruting eller noen nettverksinnstillinger
+if [ -f /usr/local/sbin/nep-ts-failover.sh ]; then
+    curl -fsSL "$GITHUB_RAW/scripts/nep-ts-failover.sh" \
+        -o /tmp/nep-ts-failover.sh
+    sudo install -m 755 /tmp/nep-ts-failover.sh \
+        /usr/local/sbin/nep-ts-failover.sh
+    LOG "nep-ts-failover.sh oppdatert"
+fi
+
+# ── Pushover watchdog (kun companion – kun hvis installert) ─────────────────
+if systemctl list-unit-files nep-watchdog.service &>/dev/null 2>&1; then
+    curl -fsSL "$GITHUB_RAW/scripts/nep-watchdog.py" \
+        -o "$BASE/nep-watchdog.py"
+    chmod +x "$BASE/nep-watchdog.py"
+    LOG "nep-watchdog.py oppdatert"
+fi
+
+# ── Restart tjenester ───────────────────────────────────────────────────────
+# IKKE: satellite, tailscaled, nep-iprule, nep-ts-failover.timer
+sudo systemctl restart nep-health.service
+LOG "nep-health restartet"
+
+systemctl is-active --quiet nep-satellite-watchdog.service 2>/dev/null \
+    && { sudo systemctl restart nep-satellite-watchdog.service; LOG "nep-satellite-watchdog restartet"; } || true
+
+systemctl is-active --quiet nep-watchdog.service 2>/dev/null \
+    && { sudo systemctl restart nep-watchdog.service; LOG "nep-watchdog restartet"; } || true
+
+LOG "Oppdatering fullført"
