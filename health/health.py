@@ -13,6 +13,7 @@ TS_DEV        = os.environ.get("TS_DEV", "tailscale0")
 COMPANION_PORT= int(os.environ.get("COMPANION_PORT", "8000"))
 
 FAILOVER_FLAG     = "/home/pi/.nep-ts-failover-disabled"
+NEP_MODE_FLAG     = "/home/pi/.nep-mode-disabled"
 FORCE_MODE_FILE   = "/run/nep-ts-failover/force_mode"
 SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
@@ -205,6 +206,7 @@ def health():
         "version":    VERSION,
         "watchdog":   _service_active("nep-satellite-watchdog"),
         "satellite_connected": satellite_connected(),
+        "nep_mode":   "disabled" if os.path.exists(NEP_MODE_FLAG) else "active",
     })
 
 @app.route("/route", methods=["POST"])
@@ -374,6 +376,32 @@ button:active{{background:#357acc}}
 <div class="nav"><a href="/failover">← Failover</a></div>
 </body></html>"""
     return Response(html, mimetype="text/html")
+
+
+@app.route("/mode", methods=["POST"])
+def set_nep_mode():
+    action = request.form.get("action", "")
+    if action == "disable":
+        subprocess.run(["sudo", "systemctl", "stop",
+            "nep-ts-failover.timer", "nep-satellite-watchdog.service"],
+            capture_output=True)
+        subprocess.run(["sudo", "systemctl", "mask",
+            "nep-ts-failover.timer", "nep-satellite-watchdog.service"],
+            capture_output=True)
+        open(NEP_MODE_FLAG, "w").close()
+    elif action == "enable":
+        subprocess.run(["sudo", "systemctl", "unmask",
+            "nep-ts-failover.timer", "nep-satellite-watchdog.service"],
+            capture_output=True)
+        subprocess.run(["sudo", "systemctl", "enable", "--now",
+            "nep-ts-failover.timer", "nep-satellite-watchdog.service"],
+            capture_output=True)
+        try:
+            os.remove(NEP_MODE_FLAG)
+        except FileNotFoundError:
+            pass
+    disabled = os.path.exists(NEP_MODE_FLAG)
+    return jsonify({"nep_mode": "disabled" if disabled else "active"})
 
 
 @app.route("/update", methods=["POST"])

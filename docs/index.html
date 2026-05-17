@@ -360,6 +360,18 @@ body{
 .upd-state.done{color:var(--green)}
 .upd-state.err{color:var(--red)}
 
+/* ── NEP MODE BUTTON ── */
+.mode-btn{
+  font-size:.65em;font-weight:600;
+  padding:2px 8px;border-radius:4px;
+  border:1px solid var(--border-strong);
+  background:rgba(255,255,255,.04);
+  color:var(--text2);cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+  line-height:1.6;
+}
+.mode-btn:hover{background:rgba(255,255,255,.08);color:var(--text);border-color:rgba(255,255,255,.18)}
+
 /* ── DEVICE CARD (ping-only) ── */
 .dcard{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -661,6 +673,26 @@ async function setRouteMode(idx, mode){
   }catch(e){console.error(e);}
 }
 
+// ── NEP MODE ──
+async function setNepMode(idx, action){
+  const p=pis[idx];
+  const key=JSON.stringify(p);
+  const d=live[key];
+  const addr=d?._via==='ts'?p.ts:p.lan||p.ts;
+  if(!addr)return;
+  try{
+    await fetch(`http://${addr}/mode`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'action='+action,
+      signal:AbortSignal.timeout(5000)
+    });
+    const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
+    live[key]={...await r.json(),_via:d._via};
+    render();
+  }catch(e){console.error(e);}
+}
+
 // ── FETCH ──
 async function fetchOne(addr,timeout=4000){
   const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(timeout)});
@@ -768,6 +800,9 @@ function render(){
     const tempCol=temp>70?'#ef4444':temp>55?'#f59e0b':'#00d26a';
     const satConn=d.satellite_connected;
     const satDisc=satConn===false;
+    const nepMode=d.nep_mode;
+    const hasModeCtrl=nepMode!==undefined;
+    const modeActive=nepMode!=='disabled';
     const cardClass=satDisc?'sat-disc':isTs?'ts':'ok';
     const dotClass=satDisc?'sat-disc':isTs?'ts-mode':'online';
     const badge=isTs?'<span class="conn-badge cb-ts">TAILSCALE</span>':'<span class="conn-badge cb-lan">LAN</span>';
@@ -818,6 +853,7 @@ function render(){
             <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
             ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
             <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
+            ${hasModeCtrl?`<div class="kv" style="margin-top:4px"><span class="k">NEP Modus</span><div style="display:flex;align-items:center;gap:7px"><span class="v ${modeActive?'green':'orange'}">${modeActive?'✓ Aktiv':'✗ Av'}</span><button class="mode-btn" onclick="event.stopPropagation();setNepMode(${idx},'${modeActive?'disable':'enable'}')">${modeActive?'Deaktiver':'Aktiver'}</button></div></div>`:''}
             ${sshIp ? `<a class="ssh-btn" href="ssh://pi@${sshIp}">⌨ SSH inn</a>` : ''}
           </div>
         </div>
