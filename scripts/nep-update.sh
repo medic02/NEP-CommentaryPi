@@ -75,7 +75,8 @@ sudo systemctl restart nep-health.service
 LOG "nep-health restartet"
 
 
-systemctl is-active --quiet nep-watchdog.service 2>/dev/null \
-    && { sudo systemctl restart nep-watchdog.service; LOG "nep-watchdog restartet"; } || true
+if systemctl list-unit-files nep-watchdog.service &>/dev/null 2>&1; then
+    sudo systemctl restart nep-watchdog.service 2>/dev/null && LOG "nep-watchdog restartet" || true
+fi
 
 LOG "Oppdatering fullført"
