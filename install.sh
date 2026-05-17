@@ -128,7 +128,6 @@ sudo tee /etc/systemd/system/nep-satellite-watchdog.service > /dev/null <<EOF
 [Unit]
 Description=NEP Satellite Watchdog – auto-restart ved stuck reconnect
 After=satellite.service
-Requires=satellite.service
 
 [Service]
 Type=simple

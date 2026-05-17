@@ -25,8 +25,7 @@ if systemctl list-unit-files satellite.service &>/dev/null 2>&1; then
         /usr/local/sbin/nep-satellite-watchdog.sh
     LOG "nep-satellite-watchdog.sh installert/oppdatert"
 
-    if ! systemctl list-unit-files nep-satellite-watchdog.service &>/dev/null 2>&1; then
-        sudo tee /etc/systemd/system/nep-satellite-watchdog.service > /dev/null <<'UNIT'
+    sudo tee /etc/systemd/system/nep-satellite-watchdog.service > /dev/null <<'UNIT'
 [Unit]
 Description=NEP Satellite Watchdog – auto-restart ved stuck reconnect
 After=satellite.service
@@ -40,13 +39,10 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 UNIT
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now nep-satellite-watchdog.service
-        LOG "nep-satellite-watchdog.service opprettet og startet"
-    else
-        sudo systemctl restart nep-satellite-watchdog.service 2>/dev/null && \
-            LOG "nep-satellite-watchdog restartet" || true
-    fi
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now nep-satellite-watchdog.service 2>/dev/null || \
+        sudo systemctl restart nep-satellite-watchdog.service 2>/dev/null || true
+    LOG "nep-satellite-watchdog.service oppdatert og startet"
 else
     LOG "Ingen satellite.service – hopper over watchdog"
 fi
