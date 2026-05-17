@@ -42,8 +42,8 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
     sudo systemctl daemon-reload
-    sudo systemctl enable nep-satellite-watchdog.service
-    LOG "nep-satellite-watchdog.service opprettet og aktivert"
+    sudo systemctl enable --now nep-satellite-watchdog.service
+    LOG "nep-satellite-watchdog.service opprettet og startet"
 fi
 
 # ── Failover script (kun hvis installert) ───────────────────────────────────
@@ -69,8 +69,8 @@ fi
 sudo systemctl restart nep-health.service
 LOG "nep-health restartet"
 
-systemctl is-active --quiet nep-satellite-watchdog.service 2>/dev/null \
-    && { sudo systemctl restart nep-satellite-watchdog.service; LOG "nep-satellite-watchdog restartet"; } || true
+sudo systemctl restart nep-satellite-watchdog.service 2>/dev/null \
+    && LOG "nep-satellite-watchdog restartet" || true
 
 systemctl is-active --quiet nep-watchdog.service 2>/dev/null \
     && { sudo systemctl restart nep-watchdog.service; LOG "nep-watchdog restartet"; } || true
