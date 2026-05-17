@@ -106,6 +106,7 @@ body{
 .card.ok{--accent-a:var(--green);--accent-b:rgba(0,210,106,0.2);border-color:rgba(0,210,106,0.12)}
 .card.ts{--accent-a:var(--purple);--accent-b:rgba(129,140,248,0.2);border-color:rgba(129,140,248,0.12)}
 .card.offline{--accent-a:var(--red);--accent-b:rgba(239,68,68,0.2);border-color:rgba(239,68,68,0.1);opacity:.55}
+.card.sat-disc{--accent-a:var(--orange);--accent-b:rgba(245,158,11,0.2);border-color:rgba(245,158,11,0.15)}
 
 /* ── CARD TOP ── */
 .card-top{
@@ -140,6 +141,16 @@ body{
   box-shadow:0 0 6px rgba(129,140,248,.4);
 }
 .status-dot.ts-mode::after{animation:ring-pulse-purple 2s ease-out infinite}
+.status-dot.sat-disc{
+  background:var(--orange);
+  color:var(--orange);
+  box-shadow:0 0 6px rgba(245,158,11,.4);
+}
+.status-dot.sat-disc::after{animation:ring-pulse-orange 2s ease-out infinite}
+@keyframes ring-pulse-orange{
+  0%{inset:-3px;opacity:.7}
+  100%{inset:-9px;opacity:0}
+}
 .status-dot.offline{background:var(--red);color:var(--red)}
 
 @keyframes ring-pulse-green{
@@ -752,8 +763,10 @@ function render(){
     const temp=d.cpu_temp_c;
     const tempPct=temp!=null?Math.min(100,Math.max(0,(temp-30)/50*100)):0;
     const tempCol=temp>70?'#ef4444':temp>55?'#f59e0b':'#00d26a';
-    const cardClass=isTs?'ts':'ok';
-    const dotClass=isTs?'ts-mode':'online';
+    const satConn=d.satellite_connected;
+    const satDisc=satConn===false;
+    const cardClass=satDisc?'sat-disc':isTs?'ts':'ok';
+    const dotClass=satDisc?'sat-disc':isTs?'ts-mode':'online';
     const badge=isTs?'<span class="conn-badge cb-ts">TAILSCALE</span>':'<span class="conn-badge cb-lan">LAN</span>';
     const sshIp=(viaTs?p.ts:p.lan||p.ts||'').split(':')[0];
     return `
@@ -774,7 +787,8 @@ function render(){
         <div class="card-body">
           <div class="section">
             <div class="section-label">Companion</div>
-            <div class="kv"><span class="k">Status</span><span class="v ${d.companion?.lan_ok?'green':isTs?'orange':'red'}">${d.companion?.lan_ok?'Tilkoblet (LAN)':isTs?'Tilkoblet (TS)':'Ikke tilkoblet'}</span></div>
+            <div class="kv"><span class="k">Satellite</span><span class="v ${satConn===true?'green':satConn===false?'red':'muted'}">${satConn===true?'✓ Tilkoblet':satConn===false?'✗ Frakoblet':'–'}</span></div>
+            <div class="kv"><span class="k">Rute</span><span class="v ${d.companion?.lan_ok?'green':isTs?'purple':'muted'}">${d.companion?.lan_ok?'LAN':isTs?'Tailscale':'–'}</span></div>
             <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
           </div>
           <hr class="divider">
