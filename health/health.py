@@ -378,9 +378,9 @@ button:active{{background:#357acc}}
     return Response(html, mimetype="text/html")
 
 
-@app.route("/mode", methods=["POST"])
+@app.route("/mode", methods=["GET", "POST"])
 def set_nep_mode():
-    action = request.form.get("action", "")
+    action = request.form.get("action", "") if request.method == "POST" else ""
     if action == "disable":
         subprocess.run(["sudo", "systemctl", "stop",
             "nep-ts-failover.timer", "nep-satellite-watchdog.service"],
@@ -401,7 +401,79 @@ def set_nep_mode():
         except FileNotFoundError:
             pass
     disabled = os.path.exists(NEP_MODE_FLAG)
-    return jsonify({"nep_mode": "disabled" if disabled else "active"})
+
+    # POST fra dashboard → JSON
+    if request.method == "POST" and request.content_type and "json" not in request.content_type:
+        # sjekk om klient forventer JSON (Accept: application/json) eller er dashboard-fetch
+        if "text/html" not in request.headers.get("Accept", ""):
+            return jsonify({"nep_mode": "disabled" if disabled else "active"})
+
+    if request.method == "POST" and not request.headers.get("Accept","").startswith("text/html"):
+        return jsonify({"nep_mode": "disabled" if disabled else "active"})
+
+    # GET (eller POST fra nettleser) → HTML-side
+    status     = "DEAKTIVERT" if disabled else "AKTIV"
+    color      = "#f59e0b"    if disabled else "#00cc44"
+    btn_action = "enable"     if disabled else "disable"
+    btn_label  = "✓ Aktiver NEP Modus" if disabled else "✗ Deaktiver NEP Modus"
+    btn_color  = "#00cc44"    if disabled else "#f59e0b"
+    desc       = ("Failover og watchdog er deaktivert.\nAktiver for normal NEP-drift."
+                  if disabled else
+                  "Failover og watchdog er aktive.\nDeaktiver når Pi brukes med annen companion.")
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEP Modus – {APP_ID}</title>
+<style>
+body{{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;
+     display:flex;flex-direction:column;align-items:center;padding:40px 20px;gap:0}}
+h1{{margin-bottom:4px}}.sub{{color:#888;margin-bottom:32px;font-size:.9em}}
+.status{{font-size:2.2em;font-weight:bold;color:{color};margin-bottom:10px}}
+.desc{{color:#888;margin-bottom:32px;font-size:.9em;text-align:center;
+       max-width:300px;white-space:pre-line;line-height:1.6}}
+form button{{padding:14px 36px;font-size:1.1em;border:none;border-radius:8px;
+             background:{btn_color};color:#fff;cursor:pointer;font-weight:bold}}
+.nav{{margin-top:28px;font-size:.85em;color:#888}}
+.nav a{{color:#4f9cf9;text-decoration:none}}
+</style></head>
+<body>
+<h1>NEP Modus</h1>
+<div class="sub">{APP_ID}</div>
+<div class="status">{status}</div>
+<div class="desc">{desc}</div>
+<form method="POST">
+  <input type="hidden" name="action" value="{btn_action}">
+  <button type="submit">{btn_label}</button>
+</form>
+<div class="nav"><a href="/failover">Failover</a> · <a href="/settings">Innstillinger</a></div>
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/diagnose", methods=["POST"])
+def run_diagnose():
+    import glob as _glob
+    script = "/usr/local/sbin/nep-diagnose.sh"
+    before = set(_glob.glob("/tmp/nep-diag-*.txt"))
+    try:
+        subprocess.run(["bash", script], timeout=30, capture_output=True)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    after = set(_glob.glob("/tmp/nep-diag-*.txt"))
+    new = sorted(after - before)
+    if new:
+        try:
+            with open(new[-1]) as f:
+                content = f.read()
+            fname = "nep-diag-{}.txt".format(APP_ID.replace(" ", "-"))
+            return Response(
+                content, mimetype="text/plain",
+                headers={"Content-Disposition": f"attachment; filename={fname}",
+                         "Access-Control-Expose-Headers": "Content-Disposition"}
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Diagnose-script ikke funnet eller ingen ny fil generert"}), 500
 
 
 @app.route("/update", methods=["POST"])

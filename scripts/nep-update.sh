@@ -17,6 +17,11 @@ curl -fsSL "$GITHUB_RAW/assets/nep-logo.png"  -o "$BASE/nep-logo.png" 2>/dev/nul
 chmod +x "$BASE/health.py"
 LOG "health.py + dashboard oppdatert"
 
+# ── Diagnose script ────────────────────────────────────────────────────────
+curl -fsSL "$GITHUB_RAW/scripts/nep-diagnose.sh" -o /tmp/nep-diagnose.sh
+sudo install -m 755 /tmp/nep-diagnose.sh /usr/local/sbin/nep-diagnose.sh
+LOG "nep-diagnose.sh installert/oppdatert"
+
 # ── Satellite watchdog (kun på Pi-er med satellite.service) ─────────────────
 if systemctl list-unit-files satellite.service &>/dev/null 2>&1; then
     curl -fsSL "$GITHUB_RAW/scripts/nep-satellite-watchdog.sh" \

@@ -673,6 +673,32 @@ async function setRouteMode(idx, mode){
   }catch(e){console.error(e);}
 }
 
+// ── DIAGNOSE ──
+async function runDiagnose(idx, btn){
+  const p=pis[idx];
+  const key=JSON.stringify(p);
+  const d=live[key];
+  const addr=d?._via==='ts'?p.ts:p.lan||p.ts;
+  if(!addr)return;
+  const orig=btn.textContent;
+  btn.textContent='Samler...';btn.disabled=true;
+  try{
+    const res=await fetch(`http://${addr}/diagnose`,{method:'POST',signal:AbortSignal.timeout(35000)});
+    if(!res.ok){btn.textContent='✗ Feil';btn.disabled=false;setTimeout(()=>{btn.textContent=orig;},3000);return;}
+    const blob=await res.blob();
+    const name=(p.name||d?.id||'Pi').replace(/\s+/g,'-');
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`nep-diag-${name}.txt`;a.click();
+    URL.revokeObjectURL(url);
+    btn.textContent='✓ Lastet ned';
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},3000);
+  }catch(e){
+    btn.textContent='✗ Timeout';btn.disabled=false;
+    setTimeout(()=>{btn.textContent=orig;},3000);
+  }
+}
+
 // ── NEP MODE ──
 async function setNepMode(idx, action){
   const p=pis[idx];
@@ -854,7 +880,7 @@ function render(){
             ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
             <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
             ${hasModeCtrl?`<div class="kv" style="margin-top:4px"><span class="k">NEP Modus</span><div style="display:flex;align-items:center;gap:7px"><span class="v ${modeActive?'green':'orange'}">${modeActive?'✓ Aktiv':'✗ Av'}</span><button class="mode-btn" onclick="event.stopPropagation();setNepMode(${idx},'${modeActive?'disable':'enable'}')">${modeActive?'Deaktiver':'Aktiver'}</button></div></div>`:''}
-            ${sshIp ? `<a class="ssh-btn" href="ssh://pi@${sshIp}">⌨ SSH inn</a>` : ''}
+            ${sshIp ? `<div style="display:flex;gap:6px;margin-top:10px"><a class="ssh-btn" style="margin-top:0;flex:1" href="ssh://pi@${sshIp}">⌨ SSH</a><button class="ssh-btn" style="margin-top:0;flex:1" onclick="runDiagnose(${idx},this)">🔍 Diagnose</button></div>` : ''}
           </div>
         </div>
       </div>`;
