@@ -6,7 +6,7 @@ import json, os, time, urllib.request, urllib.parse, subprocess
 from datetime import datetime
 
 DASHBOARD_CONFIG = "/home/pi/health/dashboard-config.json"
-STATE_DIR        = "/run/nep-watchdog"
+STATE_DIR        = "/tmp/nep-watchdog"
 STATE_FILE       = f"{STATE_DIR}/state.json"
 CHECK_INTERVAL   = int(os.environ.get("CHECK_INTERVAL", "30"))
 PUSHOVER_TOKEN   = os.environ.get("PUSHOVER_TOKEN", "")
