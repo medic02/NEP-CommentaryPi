@@ -856,7 +856,10 @@ async function runUpdate(){
     if(!addr){ setState('Offline','err'); return; }
     setState('Sender...','doing');
     try{
-      await fetch(`http://${addr}/update`,{method:'POST',signal:AbortSignal.timeout(5000)});
+      const res=await fetch(`http://${addr}/update`,{method:'POST',signal:AbortSignal.timeout(5000)});
+      if(!res.ok){ setState('✗ Gammel versjon – oppdater manuelt','err'); return; }
+      const json=await res.json();
+      if(!json.ok){ setState('✗ Feil fra Pi','err'); return; }
       setState('Oppdaterer…','doing');
       // Vent på at tjenesten restartes (~15s), poll til online
       await new Promise(r=>setTimeout(r,5000));
