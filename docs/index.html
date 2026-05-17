@@ -360,6 +360,23 @@ body{
 .upd-state.done{color:var(--green)}
 .upd-state.err{color:var(--red)}
 
+/* ── NOTIFICATIONS MODAL ── */
+.notif-section{margin-bottom:16px}
+.notif-section:last-of-type{margin-bottom:0}
+.notif-section-title{font-size:.6em;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.notif-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:.83em;color:var(--text2)}
+.notif-row .nr-label{flex:1}
+.notif-num{width:56px;background:rgba(0,0,0,.3);border:1px solid var(--border-strong);color:var(--text);padding:4px 8px;border-radius:6px;font-size:.9em;font-family:var(--mono);text-align:center}
+.notif-num:focus{outline:none;border-color:rgba(56,189,248,0.5)}
+/* Toggle switch */
+.sw{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-track{position:absolute;inset:0;border-radius:20px;background:rgba(255,255,255,.1);border:1px solid var(--border-strong);cursor:pointer;transition:background .2s}
+.sw input:checked+.sw-track{background:rgba(0,210,106,0.35);border-color:rgba(0,210,106,0.5)}
+.sw-track::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#94a3b8;top:2px;left:2px;transition:transform .2s,background .2s}
+.sw input:checked+.sw-track::after{transform:translateX(16px);background:var(--green)}
+.notif-test-result{font-size:.75em;margin-top:6px;min-height:1.2em}
+
 /* ── NEP MODE BUTTON ── */
 .mode-btn{
   font-size:.65em;font-weight:600;
@@ -412,6 +429,7 @@ body{
     <span id="refresh-ring" class="refresh-ring"></span>
     <button class="btn" onclick="openAdd()">＋ Legg til Pi</button>
     <button class="btn" onclick="toggleManage()" id="manage-btn">Administrer</button>
+    <button class="btn" onclick="openNotif()">🔔 Varsler</button>
     <button class="btn" onclick="openUpdate()">⬆ Oppdater alle</button>
     <button class="btn" onclick="openCmds()">⌨ Kommandoer</button>
   </div>
@@ -524,6 +542,47 @@ sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><bu
   </div>
 </div>
 
+<!-- ── NOTIFICATIONS MODAL ── -->
+<div class="modal-bg" id="notif-modal" onclick="if(event.target===this)closeNotif()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;max-height:90vh;overflow-y:auto">
+    <h2>🔔 Varslingsinnstillinger</h2>
+
+    <div class="notif-section">
+      <div class="notif-section-title">Pushover</div>
+      <div class="field"><label>App Token</label><input id="notif-token" type="text" placeholder="a1b2c3d4e5..."></div>
+      <div class="field" style="margin-bottom:8px"><label>User Key</label><input id="notif-user" type="text" placeholder="u1v2w3x4y5..."></div>
+      <button class="btn" id="notif-test-btn" onclick="testNotif()" style="width:100%;justify-content:center">📨 Send testmelding</button>
+      <div class="notif-test-result" id="notif-test-result"></div>
+    </div>
+
+    <div class="notif-section">
+      <div class="notif-row"><span class="nr-label" style="font-weight:600;color:var(--text)">Varsler aktivert</span><label class="sw"><input type="checkbox" id="notif-enabled"><span class="sw-track"></span></label></div>
+    </div>
+
+    <div class="notif-section">
+      <div class="notif-section-title">Varseltyper</div>
+      <div class="notif-row"><span class="nr-label">🔴 Pi går offline</span><label class="sw"><input type="checkbox" id="a-pi_offline"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">✅ Pi online igjen</span><label class="sw"><input type="checkbox" id="a-pi_online"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">⚠️ Satellite frakoblet</span><label class="sw"><input type="checkbox" id="a-satellite_disconnect"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">✅ Satellite tilkoblet igjen</span><label class="sw"><input type="checkbox" id="a-satellite_reconnect"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">🌡️ Høy temperatur</span><label class="sw"><input type="checkbox" id="a-high_temp"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">⚡ Byttet til Tailscale</span><label class="sw"><input type="checkbox" id="a-failover_to_ts"><span class="sw-track"></span></label></div>
+      <div class="notif-row"><span class="nr-label">✅ Tilbake på LAN</span><label class="sw"><input type="checkbox" id="a-failover_to_lan"><span class="sw-track"></span></label></div>
+    </div>
+
+    <div class="notif-section">
+      <div class="notif-section-title">Temperaturgrenser</div>
+      <div class="notif-row"><span class="nr-label">Varsel over</span><div style="display:flex;align-items:center;gap:6px"><input class="notif-num" id="notif-temp-warn" type="number" min="50" max="85"><span style="font-size:.8em;color:var(--muted)">°C</span></div></div>
+      <div class="notif-row"><span class="nr-label">OK under</span><div style="display:flex;align-items:center;gap:6px"><input class="notif-num" id="notif-temp-ok" type="number" min="40" max="80"><span style="font-size:.8em;color:var(--muted)">°C</span></div></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeNotif()">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveNotif()">Lagre</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const KEY = 'nep_pis_v2';
 let pis = JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -578,6 +637,57 @@ async function loadConfig(){
       saveToDisk();
     }
   }catch{}
+}
+
+// ── NOTIFICATIONS ──
+const ALERT_KEYS=['pi_offline','pi_online','satellite_disconnect','satellite_reconnect','high_temp','failover_to_ts','failover_to_lan'];
+async function openNotif(){
+  document.getElementById('notif-modal').classList.add('show');
+  document.getElementById('notif-test-result').textContent='';
+  try{
+    const r=await fetch('/notifications-config',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok)return;
+    const c=await r.json();
+    document.getElementById('notif-token').value=c.pushover_token||'';
+    document.getElementById('notif-user').value=c.pushover_user||'';
+    document.getElementById('notif-enabled').checked=c.enabled!==false;
+    ALERT_KEYS.forEach(k=>{
+      const el=document.getElementById('a-'+k);
+      if(el)el.checked=c.alerts?.[k]!==false;
+    });
+    document.getElementById('notif-temp-warn').value=c.temp_warn||75;
+    document.getElementById('notif-temp-ok').value=c.temp_ok||65;
+  }catch{}
+}
+function closeNotif(){document.getElementById('notif-modal').classList.remove('show');}
+async function saveNotif(){
+  const cfg={
+    pushover_token:document.getElementById('notif-token').value.trim(),
+    pushover_user: document.getElementById('notif-user').value.trim(),
+    enabled:       document.getElementById('notif-enabled').checked,
+    alerts:        Object.fromEntries(ALERT_KEYS.map(k=>[k,document.getElementById('a-'+k)?.checked??true])),
+    temp_warn:     parseInt(document.getElementById('notif-temp-warn').value)||75,
+    temp_ok:       parseInt(document.getElementById('notif-temp-ok').value)||65,
+  };
+  try{
+    await fetch('/notifications-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+    closeNotif();
+  }catch(e){alert('Feil: '+e.message);}
+}
+async function testNotif(){
+  const btn=document.getElementById('notif-test-btn');
+  const res=document.getElementById('notif-test-result');
+  btn.disabled=true;btn.textContent='Sender...';res.textContent='';
+  // Lagre først så watchdog bruker siste credentials
+  await saveNotif().catch(()=>{});
+  document.getElementById('notif-modal').classList.add('show');
+  try{
+    const r=await fetch('/notifications-test',{method:'POST',signal:AbortSignal.timeout(12000)});
+    const d=await r.json();
+    if(d.ok){res.textContent='✅ Sendt!';res.style.color='var(--green)';}
+    else{res.textContent='✗ '+( d.error||'Feil');res.style.color='var(--red)';}
+  }catch(e){res.textContent='✗ '+e.message;res.style.color='var(--red)';}
+  btn.disabled=false;btn.textContent='📨 Send testmelding';
 }
 
 // ── MODAL ──

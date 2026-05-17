@@ -19,6 +19,24 @@ SATELLITE_CONFIG  = "/home/satellite/satellite-config.json"
 CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 DASHBOARD_FILE    = "/home/pi/health/dashboard.html"
 DASHBOARD_CONFIG  = "/home/pi/health/dashboard-config.json"
+NOTIF_CONFIG_FILE = "/home/pi/health/notifications-config.json"
+
+DEFAULT_NOTIF_CONFIG = {
+    "pushover_token": "",
+    "pushover_user":  "",
+    "enabled": True,
+    "alerts": {
+        "pi_offline":            True,
+        "pi_online":             True,
+        "satellite_disconnect":  True,
+        "satellite_reconnect":   True,
+        "high_temp":             True,
+        "failover_to_ts":        True,
+        "failover_to_lan":       False,
+    },
+    "temp_warn": 75,
+    "temp_ok":   65,
+}
 
 DEFAULT_CARD_CONFIG = {
     "logo_pct": 34,
@@ -474,6 +492,55 @@ def run_diagnose():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     return jsonify({"error": "Diagnose-script ikke funnet eller ingen ny fil generert"}), 500
+
+
+@app.route("/notifications-config", methods=["GET", "POST"])
+def notifications_config():
+    if request.method == "POST":
+        try:
+            data = request.get_json(force=True)
+            with open(NOTIF_CONFIG_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    try:
+        with open(NOTIF_CONFIG_FILE) as f:
+            cfg = json.load(f)
+        # Fyll inn manglende felter med defaults
+        for k, v in DEFAULT_NOTIF_CONFIG.items():
+            cfg.setdefault(k, v)
+        if "alerts" in DEFAULT_NOTIF_CONFIG:
+            for k, v in DEFAULT_NOTIF_CONFIG["alerts"].items():
+                cfg["alerts"].setdefault(k, v)
+        return jsonify(cfg)
+    except Exception:
+        return jsonify(DEFAULT_NOTIF_CONFIG)
+
+
+@app.route("/notifications-test", methods=["POST"])
+def notifications_test():
+    try:
+        with open(NOTIF_CONFIG_FILE) as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = DEFAULT_NOTIF_CONFIG
+    token = cfg.get("pushover_token", "")
+    user  = cfg.get("pushover_user",  "")
+    if not token or not user:
+        return jsonify({"ok": False, "error": "Pushover ikke konfigurert"}), 400
+    try:
+        import urllib.request as _ur, urllib.parse as _up
+        data = _up.urlencode({
+            "token": token, "user": user,
+            "title": "✅ NEP Test",
+            "message": f"Pushover fungerer fra {APP_ID}!",
+            "priority": 0,
+        }).encode()
+        _ur.urlopen(_ur.Request("https://api.pushover.net/1/messages.json", data=data), timeout=10)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/update", methods=["POST"])
