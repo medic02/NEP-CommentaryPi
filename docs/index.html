@@ -438,13 +438,17 @@ body{
     <h2>Kommandoer</h2>
 
     <div class="cmd-section">
-      <div class="cmd-section-title">Installasjon</div>
+      <div class="cmd-section-title">🚀 Installasjon</div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Ny Satellite Pi (full install)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Companion Pi / kun Health API</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install-health.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Aktiver SSH på SD-kort (kjøres på Mac)</div><div class="cmd-code">touch /Volumes/bootfs/ssh</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Tailscale – logg inn</div><div class="cmd-code">sudo tailscale up</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Tailscale – aksepter subnet routes</div><div class="cmd-code">sudo tailscale set --accept-routes=true --accept-dns=false</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Sett tidssone (Norge)</div><div class="cmd-code">sudo timedatectl set-timezone Europe/Oslo</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
     </div>
 
     <div class="cmd-section">
-      <div class="cmd-section-title">Oppdatering (kjøres på Pi)</div>
+      <div class="cmd-section-title">🔄 Oppdatering</div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Health API + Dashboard</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/health/health.py -o /home/pi/health/health.py
 curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/docs/index.html -o /home/pi/health/dashboard.html
 curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/assets/nep-logo.png -o /home/pi/health/nep-logo.png
@@ -454,7 +458,8 @@ sudo systemctl restart nep-health</div></div><button class="cmd-copy" onclick="c
     </div>
 
     <div class="cmd-section">
-      <div class="cmd-section-title">Tjenester</div>
+      <div class="cmd-section-title">⚙️ Tjenester</div>
+      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Restart Satellite</div><div class="cmd-code">sudo systemctl restart satellite</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Restart alle NEP-tjenester</div><div class="cmd-code">sudo systemctl restart nep-health && sudo systemctl restart satellite</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Status</div><div class="cmd-code">systemctl status nep-health satellite nep-ts-failover.timer</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Endre Pi-navn</div><div class="cmd-code">sudo nano /etc/systemd/system/nep-health.service
@@ -463,23 +468,10 @@ sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><bu
     </div>
 
     <div class="cmd-section">
-      <div class="cmd-section-title">Logging</div>
+      <div class="cmd-section-title">📋 Logging</div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Failover-logg (live)</div><div class="cmd-code">journalctl -t nep-ts-failover -f</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Failover-logg (siste 50)</div><div class="cmd-code">journalctl -t nep-ts-failover -n 50</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
       <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Satellite-logg</div><div class="cmd-code">journalctl -u satellite -n 50</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
-
-    <div class="cmd-section">
-      <div class="cmd-section-title">Nettverk / Tailscale</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Koble til Tailscale</div><div class="cmd-code">sudo tailscale up</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Test LAN-tilkobling til companion</div><div class="cmd-code">curl --interface eth0 -m 2 http://192.168.8.101:8000/
-ping -c 3 -I eth0 192.168.8.101</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Sett tidssone (Norge)</div><div class="cmd-code">sudo timedatectl set-timezone Europe/Oslo</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
-
-    <div class="cmd-section">
-      <div class="cmd-section-title">Dashboard (fra Mac)</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Start lokal server</div><div class="cmd-code">cd /Users/factory/nep-kommentatorkit/docs && python3 -m http.server 8888 & open http://localhost:8888/</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
     </div>
 
     <div class="modal-actions" style="margin-top:20px">
@@ -509,10 +501,17 @@ function openCmds(){ document.getElementById('cmd-modal').classList.add('show');
 function closeCmds(){ document.getElementById('cmd-modal').classList.remove('show'); }
 function copyCmd(btn){
   const code=btn.closest('.cmd-row').querySelector('.cmd-code').textContent;
-  navigator.clipboard.writeText(code).then(()=>{
-    btn.textContent='✓ Kopiert';btn.classList.add('copied');
-    setTimeout(()=>{btn.textContent='Kopier';btn.classList.remove('copied');},2000);
-  });
+  const done=()=>{btn.textContent='✓ Kopiert';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Kopier';btn.classList.remove('copied');},2000);};
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(code).then(done).catch(()=>fallbackCopy(code,done));
+  } else { fallbackCopy(code,done); }
+}
+function fallbackCopy(text,cb){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch{}
+  document.body.removeChild(ta);cb();
 }
 
 async function saveToDisk(){
