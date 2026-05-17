@@ -54,15 +54,18 @@ def save_state(state):
         json.dump(state, f)
 
 def check_pi(p):
+    """Returnerer (online, satellite_connected) for en Pi."""
     for addr in [p.get("lan"), p.get("ts")]:
         if not addr:
             continue
         try:
-            urllib.request.urlopen(f"http://{addr}/health", timeout=5)
-            return True
+            r = urllib.request.urlopen(f"http://{addr}/health", timeout=5)
+            data = json.loads(r.read())
+            sat = data.get("satellite_connected")
+            return True, sat
         except Exception:
             pass
-    return False
+    return False, None
 
 def check_device(p):
     ip = p.get("ip", "").split(":")[0]
@@ -84,19 +87,48 @@ def main():
             name  = p.get("name") or p.get("type", "Enhet")
             key   = json.dumps(p, sort_keys=True)
             ptype = p.get("type", "pi")
-            online = check_pi(p) if ptype in ("pi", "") else check_device(p)
-            prev   = state.get(key)
 
-            if prev is None:
-                state[key] = online
-            elif prev != online:
-                state[key] = online
+            if ptype in ("pi", ""):
+                online, sat_conn = check_pi(p)
+            else:
+                online = check_device(p)
+                sat_conn = None
+
+            prev = state.get(key, {})
+            if not isinstance(prev, dict):
+                prev = {"online": prev, "sat": None}
+
+            # Varsle ved online/offline-endring
+            prev_online = prev.get("online")
+            if prev_online is None:
+                pass
+            elif prev_online != online:
                 if online:
                     log(f"{name}: ONLINE igjen")
                     send_pushover(f"✅ NEP – {name} online", f"{name} er tilbake online", priority=0)
                 else:
                     log(f"{name}: OFFLINE")
                     send_pushover(f"🔴 NEP – {name} OFFLINE", f"{name} har mistet tilkobling", priority=1)
+
+            # Varsle ved satellite disconnect (kun Pi-er)
+            if ptype in ("pi", "") and online and sat_conn is not None:
+                prev_sat = prev.get("sat")
+                if prev_sat is True and sat_conn is False:
+                    log(f"{name}: Satellite DISCONNECTED")
+                    send_pushover(
+                        f"⚠️ NEP – {name} satellite frakoblet",
+                        f"{name} mistet satellite-tilkobling til companion",
+                        priority=0
+                    )
+                elif prev_sat is False and sat_conn is True:
+                    log(f"{name}: Satellite reconnected")
+                    send_pushover(
+                        f"✅ NEP – {name} satellite tilkoblet",
+                        f"{name} er koblet til companion igjen",
+                        priority=0
+                    )
+
+            state[key] = {"online": online, "sat": sat_conn}
 
         save_state(state)
         time.sleep(CHECK_INTERVAL)

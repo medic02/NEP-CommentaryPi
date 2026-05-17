@@ -41,6 +41,17 @@ def _service_active(name):
     except Exception:
         return False
 
+def satellite_connected():
+    """Sjekk om satellite har aktiv TCP-tilkobling til companion (port 16622)."""
+    try:
+        out = subprocess.check_output(
+            ["ss", "-tnp", "state", "established"],
+            stderr=subprocess.DEVNULL, timeout=2
+        ).decode()
+        return "16622" in out
+    except Exception:
+        return None
+
 
 def get_force_mode():
     try:
@@ -193,6 +204,7 @@ def health():
         "ts":         int(time.time()),
         "version":    VERSION,
         "watchdog":   _service_active("nep-satellite-watchdog"),
+        "satellite_connected": satellite_connected(),
     })
 
 @app.route("/route", methods=["POST"])
