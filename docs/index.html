@@ -561,6 +561,9 @@ async function loadConfig(){
     if(Array.isArray(data)&&data.length>0){
       pis=data;
       localStorage.setItem(KEY,JSON.stringify(pis));
+    } else if(pis.length>0){
+      // Server er tom men vi har lokal data – synk til server
+      saveToDisk();
     }
   }catch{}
 }
