@@ -11,6 +11,8 @@ STATE_FILE       = f"{STATE_DIR}/state.json"
 CHECK_INTERVAL   = int(os.environ.get("CHECK_INTERVAL", "30"))
 PUSHOVER_TOKEN   = os.environ.get("PUSHOVER_TOKEN", "")
 PUSHOVER_USER    = os.environ.get("PUSHOVER_USER", "")
+TEMP_WARN        = int(os.environ.get("TEMP_WARN", "75"))   # °C – send varsel over dette
+TEMP_OK          = int(os.environ.get("TEMP_OK",   "65"))   # °C – send OK-varsel under dette
 
 def log(msg):
     subprocess.run(["logger", "-t", "nep-watchdog", msg], capture_output=True)
@@ -54,18 +56,19 @@ def save_state(state):
         json.dump(state, f)
 
 def check_pi(p):
-    """Returnerer (online, satellite_connected) for en Pi."""
+    """Returnerer (online, satellite_connected, cpu_temp_c) for en Pi."""
     for addr in [p.get("lan"), p.get("ts")]:
         if not addr:
             continue
         try:
             r = urllib.request.urlopen(f"http://{addr}/health", timeout=5)
             data = json.loads(r.read())
-            sat = data.get("satellite_connected")
-            return True, sat
+            sat  = data.get("satellite_connected")
+            temp = data.get("cpu_temp_c")
+            return True, sat, temp
         except Exception:
             pass
-    return False, None
+    return False, None, None
 
 def check_device(p):
     ip = p.get("ip", "").split(":")[0]
@@ -89,10 +92,11 @@ def main():
             ptype = p.get("type", "pi")
 
             if ptype in ("pi", ""):
-                online, sat_conn = check_pi(p)
+                online, sat_conn, temp = check_pi(p)
             else:
                 online = check_device(p)
                 sat_conn = None
+                temp = None
 
             prev = state.get(key, {})
             if not isinstance(prev, dict):
@@ -128,7 +132,28 @@ def main():
                         priority=0
                     )
 
-            state[key] = {"online": online, "sat": sat_conn}
+            # Varsle ved høy temperatur (kun Pi-er som er online)
+            if ptype in ("pi", "") and online and temp is not None:
+                prev_hot = prev.get("hot", False)
+                if not prev_hot and temp >= TEMP_WARN:
+                    log(f"{name}: HØYTEMP {temp}°C")
+                    send_pushover(
+                        f"🌡️ NEP – {name} høy temp",
+                        f"{name} er {temp}°C (grense: {TEMP_WARN}°C)",
+                        priority=1
+                    )
+                elif prev_hot and temp < TEMP_OK:
+                    log(f"{name}: Temp normal igjen {temp}°C")
+                    send_pushover(
+                        f"✅ NEP – {name} temp normal",
+                        f"{name} er nede på {temp}°C",
+                        priority=0
+                    )
+                state[key] = {"online": online, "sat": sat_conn,
+                              "hot": temp >= TEMP_WARN if temp is not None else prev_hot}
+            else:
+                state[key] = {"online": online, "sat": sat_conn,
+                              "hot": prev.get("hot", False)}
 
         save_state(state)
         time.sleep(CHECK_INTERVAL)
