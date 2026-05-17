@@ -116,10 +116,29 @@ RestartSec=2
 WantedBy=multi-user.target
 EOF
 
-# ── [3/7] Failover script ─────────────────────────────────────────────────────
-echo "[3/7] Installerer failover script..."
+# ── [3/7] Failover script + watchdog ─────────────────────────────────────────
+echo "[3/7] Installerer failover script og satellite watchdog..."
 curl -fsSL "$GITHUB_RAW/scripts/nep-ts-failover.sh" -o /tmp/nep-ts-failover.sh
 sudo install -m 755 /tmp/nep-ts-failover.sh /usr/local/sbin/nep-ts-failover.sh
+
+curl -fsSL "$GITHUB_RAW/scripts/nep-satellite-watchdog.sh" -o /tmp/nep-satellite-watchdog.sh
+sudo install -m 755 /tmp/nep-satellite-watchdog.sh /usr/local/sbin/nep-satellite-watchdog.sh
+
+sudo tee /etc/systemd/system/nep-satellite-watchdog.service > /dev/null <<EOF
+[Unit]
+Description=NEP Satellite Watchdog – auto-restart ved stuck reconnect
+After=satellite.service
+Requires=satellite.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/nep-satellite-watchdog.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 # ── [4/7] Systemd services ────────────────────────────────────────────────────
 echo "[4/7] Setter opp systemd services..."
@@ -172,6 +191,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now nep-iprule.service
 sudo systemctl enable --now nep-health.service
 sudo systemctl enable --now nep-ts-failover.timer
+sudo systemctl enable --now nep-satellite-watchdog.service
 
 # ── [5/7] Tailscale ───────────────────────────────────────────────────────────
 echo "[5/7] Tailscale..."

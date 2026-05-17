@@ -41,12 +41,12 @@ echo "Companion: $COMPANION_IP:$COMPANION_PORT"
 echo ""
 
 # ── Pakker ────────────────────────────────────────────────────────────────────
-echo "[1/3] Installerer pakker..."
+echo "[1/4] Installerer pakker..."
 sudo apt-get update -y -q
 sudo apt-get install -y -q python3 python3-venv curl
 
 # ── Health API ────────────────────────────────────────────────────────────────
-echo "[2/3] Setter opp Health API..."
+echo "[2/4] Setter opp Health API..."
 sudo systemctl stop nep-health.service 2>/dev/null || true
 
 BASE="/home/pi/health"
@@ -88,14 +88,53 @@ RestartSec=2
 WantedBy=multi-user.target
 EOF
 
+# ── Watchdog ──────────────────────────────────────────────────────────────────
+echo "[3/4] Setter opp NEP Watchdog..."
+
+PUSHOVER_TOKEN="${PUSHOVER_TOKEN:-}"
+PUSHOVER_USER="${PUSHOVER_USER:-}"
+
+if [ -z "$PUSHOVER_TOKEN" ]; then
+    read_tty PUSHOVER_TOKEN "Pushover API Token (blank = hopp over varsler): " ""
+fi
+if [ -z "$PUSHOVER_USER" ]; then
+    read_tty PUSHOVER_USER "Pushover User Key (blank = hopp over varsler): " ""
+fi
+
+curl -fsSL "$GITHUB_RAW/scripts/nep-watchdog.py" -o "$BASE/nep-watchdog.py"
+chmod +x "$BASE/nep-watchdog.py"
+
+sudo tee /etc/systemd/system/nep-watchdog.service > /dev/null <<EOF
+[Unit]
+Description=NEP Watchdog – varsler ved disconnect/reconnect
+After=network-online.target nep-health.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=$BASE
+Environment="PUSHOVER_TOKEN=$PUSHOVER_TOKEN"
+Environment="PUSHOVER_USER=$PUSHOVER_USER"
+Environment="CHECK_INTERVAL=30"
+ExecStart=$BASE/venv/bin/python $BASE/nep-watchdog.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # ── Start ─────────────────────────────────────────────────────────────────────
-echo "[3/3] Starter tjeneste..."
+echo "[4/4] Starter tjenester..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now nep-health.service
+sudo systemctl enable --now nep-watchdog.service
 
 echo ""
 echo "FERDIG ✅"
 echo ""
 echo "Health API: http://$(hostname -I | awk '{print $1}'):8080/health"
 echo "Dashboard:  http://$(hostname -I | awk '{print $1}'):8080/"
+echo "Watchdog:   journalctl -t nep-watchdog -f"
 echo ""
