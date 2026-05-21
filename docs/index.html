@@ -193,7 +193,13 @@ body{
   padding-bottom:6px;
   border-bottom:1px solid var(--border);
   margin-bottom:8px;
+  cursor:pointer;user-select:none;
+  display:flex;justify-content:space-between;align-items:center;
 }
+.section-label::after{content:'⌄';font-size:1.3em;transition:transform .2s;opacity:.4;line-height:1;font-weight:400;letter-spacing:0}
+.sec-collapsed .section-label::after{transform:rotate(-90deg)}
+.sec-collapsed .section-body{display:none}
+.sec-collapsed+.divider{display:none}
 .kv{
   display:flex;justify-content:space-between;align-items:center;
   padding:2px 0;font-size:.8em;
@@ -576,6 +582,8 @@ sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><bu
       <div class="notif-row"><span class="nr-label">OK under</span><div style="display:flex;align-items:center;gap:6px"><input class="notif-num" id="notif-temp-ok" type="number" min="40" max="80"><span style="font-size:.8em;color:var(--muted)">°C</span></div></div>
     </div>
 
+    <div id="notif-devices"></div>
+
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeNotif()">Avbryt</button>
       <button class="btn btn-primary" onclick="saveNotif()">Lagre</button>
@@ -641,9 +649,12 @@ async function loadConfig(){
 
 // ── NOTIFICATIONS ──
 const ALERT_KEYS=['pi_offline','pi_online','satellite_disconnect','satellite_reconnect','high_temp','failover_to_ts','failover_to_lan'];
+const NOTIF_DEV_ICON={pi:'🖥',switch:'🔀',router:'📡',videohub:'🎬',device:'⚡'};
+
 async function openNotif(){
   document.getElementById('notif-modal').classList.add('show');
   document.getElementById('notif-test-result').textContent='';
+  let deviceAlerts={};
   try{
     const r=await fetch('/notifications-config',{signal:AbortSignal.timeout(3000)});
     if(!r.ok)return;
@@ -657,10 +668,38 @@ async function openNotif(){
     });
     document.getElementById('notif-temp-warn').value=c.temp_warn||75;
     document.getElementById('notif-temp-ok').value=c.temp_ok||65;
+    deviceAlerts=c.device_alerts||{};
   }catch{}
+
+  // Last enheter og vis per-enhet toggles
+  try{
+    const dr=await fetch('/config',{signal:AbortSignal.timeout(3000)});
+    const devs=dr.ok?await dr.json():[];
+    const wrap=document.getElementById('notif-devices');
+    if(devs.length){
+      wrap.innerHTML=`<div class="notif-section">
+        <div class="notif-section-title">Enheter</div>
+        ${devs.map((p,i)=>{
+          const name=p.name||(p.type||'Enhet');
+          const icon=NOTIF_DEV_ICON[p.type||'pi']||'📡';
+          const checked=deviceAlerts[name]!==false;
+          return `<div class="notif-row">
+            <span class="nr-label">${icon} ${name}</span>
+            <label class="sw"><input type="checkbox" data-devname="${name.replace(/"/g,'&quot;')}" ${checked?'checked':''}><span class="sw-track"></span></label>
+          </div>`;
+        }).join('')}
+      </div>`;
+    } else { wrap.innerHTML=''; }
+  }catch{ document.getElementById('notif-devices').innerHTML=''; }
 }
+
 function closeNotif(){document.getElementById('notif-modal').classList.remove('show');}
+
 async function saveNotif(){
+  const device_alerts={};
+  document.querySelectorAll('#notif-devices input[data-devname]').forEach(el=>{
+    device_alerts[el.dataset.devname]=el.checked;
+  });
   const cfg={
     pushover_token:document.getElementById('notif-token').value.trim(),
     pushover_user: document.getElementById('notif-user').value.trim(),
@@ -668,6 +707,7 @@ async function saveNotif(){
     alerts:        Object.fromEntries(ALERT_KEYS.map(k=>[k,document.getElementById('a-'+k)?.checked??true])),
     temp_warn:     parseInt(document.getElementById('notif-temp-warn').value)||75,
     temp_ok:       parseInt(document.getElementById('notif-temp-ok').value)||65,
+    device_alerts,
   };
   try{
     await fetch('/notifications-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
@@ -761,6 +801,16 @@ function renderManage(){
         <button class="btn btn-sm btn-del" onclick="deletePi(${i})">Slett</button>
       </div>
     </div>`).join('');
+}
+
+// ── SECTION COLLAPSE ──
+const COLLAPSE_KEY='nep_collapsed_v1';
+let collapsed=JSON.parse(localStorage.getItem(COLLAPSE_KEY)||'{}');
+function toggleSection(name,e){
+  e.stopPropagation();
+  collapsed[name]=!collapsed[name];
+  localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));
+  render();
 }
 
 // ── ROUTE MODE ──
@@ -959,38 +1009,46 @@ function render(){
           ${badge}
         </div>
         <div class="card-body">
-          <div class="section">
-            <div class="section-label">Companion</div>
-            <div class="kv"><span class="k">Satellite</span><span class="v ${satConn===true?'green':satConn===false?'red':'muted'}">${satConn===true?'✓ Tilkoblet':satConn===false?'✗ Frakoblet':'–'}</span></div>
-            <div class="kv"><span class="k">Rute</span><span class="v ${d.companion?.lan_ok?'green':isTs?'purple':'muted'}">${d.companion?.lan_ok?'LAN':isTs?'Tailscale':'–'}</span></div>
-            <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
-          </div>
-          <hr class="divider">
-          <div class="section">
-            <div class="section-label">Nettverk</div>
-            <div class="kv"><span class="k">LAN</span><span class="v">${lanIp}</span></div>
-            <div class="kv"><span class="k">Tailscale</span><span class="v">${tsIp}</span></div>
-          </div>
-          <hr class="divider">
-          <div class="section">
-            <div class="section-label">Failover</div>
-            <div class="kv"><span class="k">Feilteller</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
-            <div class="route-toggle">
-              <button class="rtbtn ${fm==='auto'?'active-auto':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
-              <button class="rtbtn ${fm==='lan'?'active-lan':''}" onclick="setRouteMode(${idx},'lan')">LAN</button>
-              <button class="rtbtn ${fm==='ts'?'active-ts':''}" onclick="setRouteMode(${idx},'ts')">Tailscale</button>
+          <div class="section ${collapsed['companion']?'sec-collapsed':''}">
+            <div class="section-label" onclick="toggleSection('companion',event)">Companion</div>
+            <div class="section-body">
+              <div class="kv"><span class="k">Satellite</span><span class="v ${satConn===true?'green':satConn===false?'red':'muted'}">${satConn===true?'✓ Tilkoblet':satConn===false?'✗ Frakoblet':'–'}</span></div>
+              <div class="kv"><span class="k">Rute</span><span class="v ${d.companion?.lan_ok?'green':isTs?'purple':'muted'}">${d.companion?.lan_ok?'LAN':isTs?'Tailscale':'–'}</span></div>
+              <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
             </div>
           </div>
           <hr class="divider">
-          <div class="section">
-            <div class="section-label">System</div>
-            <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
-            ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
-            <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
-            ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
-            <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
-            ${hasModeCtrl?`<div class="kv" style="margin-top:4px"><span class="k">NEP Modus</span><div style="display:flex;align-items:center;gap:7px"><span class="v ${modeActive?'green':'orange'}">${modeActive?'✓ Aktiv':'✗ Av'}</span><button class="mode-btn" onclick="event.stopPropagation();setNepMode(${idx},'${modeActive?'disable':'enable'}')">${modeActive?'Deaktiver':'Aktiver'}</button></div></div>`:''}
-            ${sshIp ? `<div style="display:flex;gap:6px;margin-top:10px"><a class="ssh-btn" style="margin-top:0;flex:1" href="ssh://pi@${sshIp}">⌨ SSH</a><button class="ssh-btn" style="margin-top:0;flex:1" onclick="runDiagnose(${idx},this)">🔍 Diagnose</button></div>` : ''}
+          <div class="section ${collapsed['nettverk']?'sec-collapsed':''}">
+            <div class="section-label" onclick="toggleSection('nettverk',event)">Nettverk</div>
+            <div class="section-body">
+              <div class="kv"><span class="k">LAN</span><span class="v">${lanIp}</span></div>
+              <div class="kv"><span class="k">Tailscale</span><span class="v">${tsIp}</span></div>
+            </div>
+          </div>
+          <hr class="divider">
+          <div class="section ${collapsed['failover']?'sec-collapsed':''}">
+            <div class="section-label" onclick="toggleSection('failover',event)">Failover</div>
+            <div class="section-body">
+              <div class="kv"><span class="k">Feilteller</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
+              <div class="route-toggle">
+                <button class="rtbtn ${fm==='auto'?'active-auto':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
+                <button class="rtbtn ${fm==='lan'?'active-lan':''}" onclick="setRouteMode(${idx},'lan')">LAN</button>
+                <button class="rtbtn ${fm==='ts'?'active-ts':''}" onclick="setRouteMode(${idx},'ts')">Tailscale</button>
+              </div>
+            </div>
+          </div>
+          <hr class="divider">
+          <div class="section ${collapsed['system']?'sec-collapsed':''}">
+            <div class="section-label" onclick="toggleSection('system',event)">System</div>
+            <div class="section-body">
+              <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
+              ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
+              <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
+              ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
+              <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
+              ${hasModeCtrl?`<div class="kv" style="margin-top:4px"><span class="k">NEP Modus</span><div style="display:flex;align-items:center;gap:7px"><span class="v ${modeActive?'green':'orange'}">${modeActive?'✓ Aktiv':'✗ Av'}</span><button class="mode-btn" onclick="event.stopPropagation();setNepMode(${idx},'${modeActive?'disable':'enable'}')">${modeActive?'Deaktiver':'Aktiver'}</button></div></div>`:''}
+              ${sshIp ? `<div style="display:flex;gap:6px;margin-top:10px"><a class="ssh-btn" style="margin-top:0;flex:1" href="ssh://pi@${sshIp}">⌨ SSH</a><button class="ssh-btn" style="margin-top:0;flex:1" onclick="runDiagnose(${idx},this)">🔍 Diagnose</button></div>` : ''}
+            </div>
           </div>
         </div>
       </div>`;

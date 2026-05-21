@@ -142,6 +142,10 @@ def main():
             key   = json.dumps(p, sort_keys=True)
             ptype = p.get("type", "pi")
 
+            # Sjekk om varsler er aktivert for denne enheten
+            device_alerts = notif.get("device_alerts", {})
+            dev_enabled   = device_alerts.get(name, True)
+
             if ptype in ("pi", ""):
                 online, sat_conn, temp, ts_active = check_pi(p)
             else:
@@ -159,8 +163,8 @@ def main():
             prev_hot       = prev.get("hot", False)
             prev_ts_active = prev.get("ts_active")
 
-            # ── Pi offline / online ──────────────────────────────────────────
-            if prev_online is not None and prev_online != online:
+            # ── Offline / online ─────────────────────────────────────────────
+            if dev_enabled and prev_online is not None and prev_online != online:
                 if online:
                     log(f"{name}: ONLINE igjen")
                     if alerts.get("pi_online", True):
@@ -174,7 +178,7 @@ def main():
                                       priority=1, cfg=notif)
 
             # ── Satellite disconnect / reconnect ─────────────────────────────
-            if ptype in ("pi", "") and online and sat_conn is not None:
+            if dev_enabled and ptype in ("pi", "") and online and sat_conn is not None:
                 if prev_sat is True and sat_conn is False:
                     log(f"{name}: Satellite DISCONNECTED")
                     if alerts.get("satellite_disconnect", True):
@@ -189,7 +193,7 @@ def main():
                                       cfg=notif)
 
             # ── Høy temperatur ───────────────────────────────────────────────
-            if ptype in ("pi", "") and online and temp is not None:
+            if dev_enabled and ptype in ("pi", "") and online and temp is not None:
                 if not prev_hot and temp >= temp_warn:
                     log(f"{name}: HØYTEMP {temp}°C")
                     if alerts.get("high_temp", True):
@@ -204,7 +208,7 @@ def main():
                                       cfg=notif)
 
             # ── Failover: LAN → Tailscale / Tailscale → LAN ─────────────────
-            if ptype in ("pi", "") and online and ts_active is not None:
+            if dev_enabled and ptype in ("pi", "") and online and ts_active is not None:
                 if prev_ts_active is False and ts_active is True:
                     log(f"{name}: Byttet til Tailscale")
                     if alerts.get("failover_to_ts", True):
