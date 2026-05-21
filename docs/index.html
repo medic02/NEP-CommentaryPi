@@ -80,6 +80,7 @@ body{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   gap:18px;padding:24px;
+  align-items:start;
 }
 
 /* ── CARD ── */
@@ -395,6 +396,12 @@ body{
 }
 .mode-btn:hover{background:rgba(255,255,255,.08);color:var(--text);border-color:rgba(255,255,255,.18)}
 
+/* ── CARD COLLAPSE ── */
+.card-top{cursor:pointer}
+.card-top .collapse-arrow{font-size:.85em;opacity:.35;transition:transform .2s;margin-left:6px;flex-shrink:0}
+.card-collapsed .card-top .collapse-arrow{transform:rotate(-90deg)}
+.card-collapsed .card-body{display:none}
+
 /* ── DEVICE CARD (ping-only) ── */
 .dcard{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -419,6 +426,12 @@ body{
 .dcard-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .dcard-dot.online{background:var(--green);box-shadow:0 0 6px rgba(0,210,106,.4);animation:ring-pulse-green 2s ease-out infinite}
 .dcard-dot.offline{background:var(--red)}
+.dcard{cursor:pointer}
+.dcard-collapsed .dcard-ip,.dcard-collapsed .dcard-status{display:none}
+.dcard-collapsed .dcard-icon{display:none}
+.dcard-collapsed .dcard-inner{padding:10px 14px}
+.dcard .collapse-arrow{font-size:.85em;opacity:.3;transition:transform .2s;margin-left:auto;flex-shrink:0}
+.dcard-collapsed .collapse-arrow{transform:rotate(-90deg)}
 </style>
 </head>
 <body>
@@ -803,12 +816,18 @@ function renderManage(){
     </div>`).join('');
 }
 
-// ── SECTION COLLAPSE ──
+// ── COLLAPSE (seksjoner + kort) ──
 const COLLAPSE_KEY='nep_collapsed_v1';
 let collapsed=JSON.parse(localStorage.getItem(COLLAPSE_KEY)||'{}');
 function toggleSection(name,e){
   e.stopPropagation();
   collapsed[name]=!collapsed[name];
+  localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));
+  render();
+}
+function toggleCard(key,e){
+  if(e)e.stopPropagation();
+  collapsed[key]=!collapsed[key];
   localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));
   render();
 }
@@ -921,8 +940,10 @@ function renderDeviceCard(p,d){
   const online=d?.online||false;
   const name=p.name||(DTYPE_LABEL[p.type]||'Enhet');
   const icon=DTYPE_ICON[p.type]||'⚡';
+  const ckey='dcard:'+name;
+  const isCollapsed=collapsed[ckey]||false;
   return `
-    <div class="dcard ${online?'d-online':'d-offline'}">
+    <div class="dcard ${online?'d-online':'d-offline'} ${isCollapsed?'dcard-collapsed':''}" onclick="toggleCard('${ckey}',event)">
       <div class="dcard-inner">
         <div class="dcard-dot ${online?'online':'offline'}"></div>
         <div class="dcard-icon">${icon}</div>
@@ -931,6 +952,7 @@ function renderDeviceCard(p,d){
           <div class="dcard-ip">${p.ip||'–'}</div>
           <div class="dcard-status ${online?'online':'offline'}">${online?'Online':'Offline'}</div>
         </div>
+        <span class="collapse-arrow">⌄</span>
       </div>
     </div>`;
 }
@@ -993,9 +1015,11 @@ function render(){
     const dotClass=satDisc?'sat-disc':isTs?'ts-mode':'online';
     const badge=isTs?'<span class="conn-badge cb-ts">TAILSCALE</span>':'<span class="conn-badge cb-lan">LAN</span>';
     const sshIp=(viaTs?p.ts:p.lan||p.ts||'').split(':')[0];
+    const ckey='card:'+name;
+    const cardCollapsed=collapsed[ckey]||false;
     return `
-      <div class="card ${cardClass}">
-        <div class="card-top">
+      <div class="card ${cardClass} ${cardCollapsed?'card-collapsed':''}">
+        <div class="card-top" onclick="toggleCard('${ckey}',event)">
           <div class="card-id">
             <div class="status-dot ${dotClass}"></div>
             <div style="min-width:0">
@@ -1006,7 +1030,7 @@ function render(){
               </div>
             </div>
           </div>
-          ${badge}
+          <div style="display:flex;align-items:center;gap:8px">${badge}<span class="collapse-arrow">⌄</span></div>
         </div>
         <div class="card-body">
           <div class="section ${collapsed['companion']?'sec-collapsed':''}">
