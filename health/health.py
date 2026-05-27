@@ -237,6 +237,14 @@ def logo():
     except Exception:
         return Response("", status=404)
 
+@app.route("/manual")
+def manual():
+    try:
+        return send_file("/home/pi/health/manual.pdf", mimetype="application/pdf",
+                         as_attachment=False, download_name="NEP_Kommentatorkit_Manual.pdf")
+    except Exception:
+        return Response("Manual ikke funnet", status=404)
+
 @app.route("/")
 def dashboard():
     try:

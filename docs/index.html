@@ -48,6 +48,9 @@ body{
 .logo-img{height:22px;width:auto;object-fit:contain;display:block}
 .logo-divider{width:1px;height:20px;background:var(--border-strong);flex-shrink:0}
 .logo-label{font-size:.65em;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.logo-link{display:flex;align-items:center;gap:12px;text-decoration:none;border-radius:8px;padding:4px 6px;margin:-4px -6px;transition:background .15s}
+.logo-link:hover{background:rgba(255,255,255,0.06)}
+.logo-link:hover .logo-label::after{content:' · 📖 Manual';opacity:.6}
 .topbar-right{display:flex;align-items:center;gap:12px}
 .summary{display:flex;gap:12px}
 .sum-item{display:flex;align-items:center;gap:5px;font-size:.75em;color:var(--text2)}
@@ -489,11 +492,11 @@ body{
 
 <!-- ── TOPBAR ── -->
 <div class="topbar">
-  <div class="logo">
+  <a href="/manual" target="_blank" class="logo-link" title="Åpne manual">
     <img src="/logo.png" onerror="this.style.display='none'" alt="NEP" class="logo-img">
     <div class="logo-divider"></div>
     <span class="logo-label">Satellite Dashboard</span>
-  </div>
+  </a>
   <div class="topbar-right">
     <div class="summary" id="summary"></div>
     <span id="refresh-ring" class="refresh-ring"></span>
