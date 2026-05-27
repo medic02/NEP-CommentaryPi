@@ -194,12 +194,13 @@ Admin Panel er tilgjengelig kun for teknisk personell og er skjult bak en dobbel
 
 | Knapp i Admin Panel | Funksjon |
 |---|---|
-| Video Router | Åpner routing-siden for manuell routing av BMD Videohub |
+| Ruter | Åpner ruting-panelet — ett panel med alle inn- og utganger på BMD Videohub |
 | Kanal Velger | Åpner kanalvelger-siden for å tilordne TV-kanal til kombinatorboksene |
 | Slack | Åpner/viser Slack-integrasjon og BlyvisBot-status |
+| Lys | Styrer lysoppsett for kommentatorboksene |
 | Connections | Status på alle Pi-er og connections. Mulighet for å aktivere/deaktivere tilkoblinger |
 | SpeedTest | Kjører nettverkshastighetsttest fra Companion Pi |
-| Stage Timer | Tilgang til stage timer-funksjon |
+| Salvos | Lagrede ruting-presets — kjør hele ruteoppsett med ett trykk |
 | Back | Tilbake til hovedpanelet |
 
 ### 7.3 Connections-side
@@ -229,11 +230,17 @@ Kanalvelgeren tilordner TV-kanal til en komboks. Valget endrer logoen på Stream
 | Kategori | Kanaler |
 |---|---|
 | NEP (standard) | Standard — brukes når ingen spesifikk kanal er tildelt |
-| TV2 | Norsk kanal |
-| Cenera | LED-leveransefirma |
+| AlterEgo | AlterEgo |
+| CBS | CBS |
+| TV2 | TV2 Norge |
+| Cenera | Cenera |
 | C+ | Polen / Frankrike |
+| 3CAT | 3CAT |
 | Viaplay | Finland / Nederland / Sverige / Danmark / Norge |
+| UEFA | UEFA |
+| ESPN | Brasil |
 | Prime Video | Italia |
+| ZDF | ZDF |
 | TNT Sports | UK / Mexico / Chile / Brasil |
 
 ### 7.5 Komboks-side
