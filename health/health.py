@@ -20,6 +20,7 @@ CARD_CONFIG_FILE  = "/home/pi/health/card-config.json"
 DASHBOARD_FILE    = "/home/pi/health/dashboard.html"
 DASHBOARD_CONFIG  = "/home/pi/health/dashboard-config.json"
 NOTIF_CONFIG_FILE = "/home/pi/health/notifications-config.json"
+PRODUCTIONS_FILE  = "/home/pi/health/productions.json"
 
 DEFAULT_NOTIF_CONFIG = {
     "pushover_token": "",
@@ -97,22 +98,137 @@ def get_companion_ip():
 app = Flask(__name__)
 START_TIME = int(time.time())
 
+def _load_productions():
+    try:
+        with open(PRODUCTIONS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"current": None, "productions": []}
+
+def _save_productions(data):
+    with open(PRODUCTIONS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    os.chmod(PRODUCTIONS_FILE, 0o644)
+
+def _get_active_devices():
+    """Return device list for current production, fallback to dashboard-config.json."""
+    prod_data = _load_productions()
+    current_id = prod_data.get("current")
+    if current_id:
+        for p in prod_data.get("productions", []):
+            if p["id"] == current_id:
+                return p.get("devices", [])
+    try:
+        with open(DASHBOARD_CONFIG) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def _save_active_devices(devices):
+    """Save device list to current production (and dashboard-config.json as backup)."""
+    prod_data = _load_productions()
+    current_id = prod_data.get("current")
+    if current_id:
+        for p in prod_data.get("productions", []):
+            if p["id"] == current_id:
+                p["devices"] = devices
+                _save_productions(prod_data)
+                break
+    with open(DASHBOARD_CONFIG, "w") as f:
+        json.dump(devices, f)
+    os.chmod(DASHBOARD_CONFIG, 0o644)
+
 @app.route("/config", methods=["GET", "POST"])
 def dashboard_config():
     if request.method == "POST":
         try:
             data = request.get_json(force=True)
-            with open(DASHBOARD_CONFIG, "w") as f:
-                json.dump(data, f)
-            os.chmod(DASHBOARD_CONFIG, 0o644)
+            _save_active_devices(data)
             return jsonify({"ok": True})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify(_get_active_devices())
+
+@app.route("/productions", methods=["GET"])
+def get_productions():
+    return jsonify(_load_productions())
+
+@app.route("/productions", methods=["POST"])
+def create_production():
+    """Create a new production. Body: {name, devices (optional, defaults to current)}"""
     try:
-        with open(DASHBOARD_CONFIG) as f:
-            return jsonify(json.load(f))
-    except FileNotFoundError:
-        return jsonify([])
+        data = request.get_json(force=True)
+        name = data.get("name", "").strip()
+        if not name:
+            return jsonify({"ok": False, "error": "Navn mangler"}), 400
+        prod_data = _load_productions()
+        import time as _time
+        new_id = f"prod_{int(_time.time())}"
+        devices = data.get("devices", _get_active_devices())
+        prod_data["productions"].append({"id": new_id, "name": name, "devices": devices})
+        if not prod_data.get("current"):
+            prod_data["current"] = new_id
+        _save_productions(prod_data)
+        return jsonify({"ok": True, "id": new_id})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/productions/switch", methods=["POST"])
+def switch_production():
+    """Switch active production. Body: {id}"""
+    try:
+        data = request.get_json(force=True)
+        prod_id = data.get("id")
+        prod_data = _load_productions()
+        ids = [p["id"] for p in prod_data.get("productions", [])]
+        if prod_id not in ids:
+            return jsonify({"ok": False, "error": "Produksjon ikke funnet"}), 404
+        prod_data["current"] = prod_id
+        _save_productions(prod_data)
+        # Update dashboard-config.json backup
+        for p in prod_data["productions"]:
+            if p["id"] == prod_id:
+                with open(DASHBOARD_CONFIG, "w") as f:
+                    json.dump(p.get("devices", []), f)
+                os.chmod(DASHBOARD_CONFIG, 0o644)
+                break
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/productions/<prod_id>", methods=["PATCH"])
+def rename_production(prod_id):
+    """Rename a production. Body: {name}"""
+    try:
+        data = request.get_json(force=True)
+        name = data.get("name", "").strip()
+        if not name:
+            return jsonify({"ok": False, "error": "Navn mangler"}), 400
+        prod_data = _load_productions()
+        for p in prod_data.get("productions", []):
+            if p["id"] == prod_id:
+                p["name"] = name
+                _save_productions(prod_data)
+                return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Ikke funnet"}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/productions/<prod_id>", methods=["DELETE"])
+def delete_production(prod_id):
+    """Delete a production."""
+    try:
+        prod_data = _load_productions()
+        prods = prod_data.get("productions", [])
+        if len(prods) <= 1:
+            return jsonify({"ok": False, "error": "Kan ikke slette siste produksjon"}), 400
+        prod_data["productions"] = [p for p in prods if p["id"] != prod_id]
+        if prod_data.get("current") == prod_id:
+            prod_data["current"] = prod_data["productions"][0]["id"]
+        _save_productions(prod_data)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/logo.png")
 def logo():

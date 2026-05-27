@@ -53,6 +53,57 @@ body{
 .sum-item{display:flex;align-items:center;gap:5px;font-size:.75em;color:var(--text2)}
 .sum-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
+/* ── PRODUCTION SELECTOR ── */
+.prod-wrap{position:relative}
+.prod-btn{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);
+  color:var(--blue);font-size:.78em;font-weight:600;
+  padding:5px 12px;border-radius:7px;cursor:pointer;
+  white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;
+  transition:background .15s,border-color .15s;
+}
+.prod-btn:hover{background:rgba(56,189,248,0.16);border-color:rgba(56,189,248,0.45)}
+.prod-btn .prod-icon{font-size:.85em;flex-shrink:0}
+.prod-btn .prod-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prod-btn .prod-arrow{font-size:.65em;flex-shrink:0;opacity:.7;transition:transform .15s}
+.prod-btn.open .prod-arrow{transform:rotate(180deg)}
+.prod-dropdown{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:#0d1626;border:1px solid var(--border-strong);
+  border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);
+  min-width:220px;z-index:200;overflow:hidden;padding:4px 0;
+}
+.prod-dropdown.show{display:block}
+.prod-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;font-size:.8em;cursor:pointer;
+  color:var(--text2);transition:background .12s;
+}
+.prod-item:hover{background:rgba(255,255,255,0.06);color:var(--text)}
+.prod-item.active{color:var(--blue);font-weight:600}
+.prod-item.active::after{content:'✓';margin-left:auto;font-size:.85em}
+.prod-divider{height:1px;background:var(--border);margin:4px 0}
+.prod-item.add{color:var(--green)}
+.prod-item.manage-item{color:var(--muted);font-size:.75em}
+
+/* ── PRODUCTION MODAL ── */
+.prod-modal-list{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.prod-row{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;
+}
+.prod-row.current-row{border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.05)}
+.prod-row-name{flex:1;font-size:.85em;font-weight:600;color:var(--text)}
+.prod-row-badge{font-size:.7em;color:var(--blue);background:rgba(56,189,248,0.1);
+  border:1px solid rgba(56,189,248,0.2);padding:1px 7px;border-radius:10px}
+.prod-row-btns{display:flex;gap:6px}
+.prod-row-btn{background:none;border:1px solid var(--border);color:var(--muted);
+  font-size:.72em;padding:3px 9px;border-radius:6px;cursor:pointer;transition:all .15s}
+.prod-row-btn:hover{border-color:var(--border-strong);color:var(--text)}
+.prod-row-btn.danger:hover{border-color:#ef4444;color:#ef4444}
+
 /* ── BUTTONS ── */
 .btn{
   background:rgba(255,255,255,0.04);
@@ -446,6 +497,20 @@ body{
   <div class="topbar-right">
     <div class="summary" id="summary"></div>
     <span id="refresh-ring" class="refresh-ring"></span>
+    <!-- Production selector -->
+    <div class="prod-wrap" id="prod-wrap">
+      <button class="prod-btn" id="prod-btn" onclick="toggleProdDropdown()">
+        <span class="prod-icon">🎬</span>
+        <span class="prod-name" id="prod-current-name">Standard</span>
+        <span class="prod-arrow">▼</span>
+      </button>
+      <div class="prod-dropdown" id="prod-dropdown">
+        <div id="prod-list"></div>
+        <div class="prod-divider"></div>
+        <div class="prod-item add" onclick="closeProdDropdown();promptNewProd()">＋ Ny produksjon</div>
+        <div class="prod-item manage-item" onclick="closeProdDropdown();openProdModal()">⚙ Administrer produksjoner</div>
+      </div>
+    </div>
     <button class="btn" onclick="openAdd()">＋ Legg til Pi</button>
     <button class="btn" onclick="toggleManage()" id="manage-btn">Administrer</button>
     <button class="btn" onclick="openNotif()">🔔 Varsler</button>
@@ -600,6 +665,19 @@ sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><bu
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeNotif()">Avbryt</button>
       <button class="btn btn-primary" onclick="saveNotif()">Lagre</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRODUCTION MODAL ── -->
+<div class="modal-bg" id="prod-modal" onclick="if(event.target===this)closeProdModal()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <h2>Produksjoner</h2>
+    <p style="font-size:.82em;color:var(--text2);margin-bottom:16px">Administrer produksjoner – hver produksjon husker sine egne enheter.</p>
+    <div class="prod-modal-list" id="prod-modal-list"></div>
+    <div class="modal-actions" style="margin-top:0">
+      <button class="btn btn-cancel" onclick="closeProdModal()">Lukk</button>
+      <button class="btn btn-primary" onclick="closeProdModal();promptNewProd()">＋ Ny produksjon</button>
     </div>
   </div>
 </div>
@@ -1150,7 +1228,125 @@ async function runUpdate(){
 }
 
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+
+// ── PRODUCTIONS ──
+let prodData={current:null,productions:[]};
+
+async function loadProductions(){
+  try{
+    const r=await fetch('/productions',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok)return;
+    prodData=await r.json();
+    renderProdDropdown();
+  }catch{}
+}
+
+function renderProdDropdown(){
+  const list=document.getElementById('prod-list');
+  const nameEl=document.getElementById('prod-current-name');
+  const current=prodData.productions.find(p=>p.id===prodData.current);
+  nameEl.textContent=current?current.name:'Standard';
+  list.innerHTML=prodData.productions.map(p=>`
+    <div class="prod-item${p.id===prodData.current?' active':''}" onclick="switchProduction('${p.id}')">
+      🎬 ${escHtml(p.name)}
+    </div>`).join('');
+}
+
+function toggleProdDropdown(){
+  const btn=document.getElementById('prod-btn');
+  const drop=document.getElementById('prod-dropdown');
+  if(drop.classList.contains('show')){closeProdDropdown();}
+  else{drop.classList.add('show');btn.classList.add('open');}
+}
+
+function closeProdDropdown(){
+  document.getElementById('prod-dropdown').classList.remove('show');
+  document.getElementById('prod-btn').classList.remove('open');
+}
+
+async function switchProduction(id){
+  closeProdDropdown();
+  try{
+    await fetch('/productions/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    prodData.current=id;
+    renderProdDropdown();
+    await loadConfig();
+    render();fetchAll();
+  }catch(e){alert('Feil: '+e.message);}
+}
+
+async function promptNewProd(){
+  const name=prompt('Navn på ny produksjon:');
+  if(!name||!name.trim())return;
+  try{
+    const r=await fetch('/productions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),devices:pis})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const prod=await r.json();
+    await switchProduction(prod.id);
+    await loadProductions();
+  }catch(e){alert('Feil: '+e.message);}
+}
+
+function openProdModal(){
+  renderProdModal();
+  document.getElementById('prod-modal').classList.add('show');
+}
+
+function closeProdModal(){
+  document.getElementById('prod-modal').classList.remove('show');
+}
+
+function renderProdModal(){
+  const list=document.getElementById('prod-modal-list');
+  const multi=prodData.productions.length>1;
+  list.innerHTML=prodData.productions.map(p=>`
+    <div class="prod-row${p.id===prodData.current?' current-row':''}">
+      <span class="prod-row-name">${escHtml(p.name)}</span>
+      ${p.id===prodData.current?'<span class="prod-row-badge">Aktiv</span>':''}
+      <div class="prod-row-btns">
+        ${p.id!==prodData.current?`<button class="prod-row-btn" onclick="switchProdFromModal('${p.id}')">Aktiver</button>`:''}
+        <button class="prod-row-btn" onclick="renameProd('${p.id}')">Gi nytt navn</button>
+        ${multi?`<button class="prod-row-btn danger" onclick="deleteProd('${p.id}')">Slett</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+async function switchProdFromModal(id){
+  closeProdModal();
+  await switchProduction(id);
+}
+
+async function renameProd(id){
+  const prod=prodData.productions.find(p=>p.id===id);
+  const name=prompt('Nytt navn:',prod?.name||'');
+  if(!name||!name.trim())return;
+  try{
+    await fetch('/productions/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim()})});
+    await loadProductions();
+    renderProdModal();
+  }catch(e){alert('Feil: '+e.message);}
+}
+
+async function deleteProd(id){
+  if(!confirm('Slett denne produksjonen?'))return;
+  try{
+    const r=await fetch('/productions/'+id,{method:'DELETE'});
+    if(!r.ok)throw new Error(await r.text());
+    await loadProductions();
+    await loadConfig();
+    render();renderProdModal();
+  }catch(e){alert('Feil: '+e.message);}
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Close dropdown on outside click
+document.addEventListener('click',e=>{
+  if(!document.getElementById('prod-wrap').contains(e.target))closeProdDropdown();
+});
+
 loadConfig().then(()=>{ render(); if(pis.length)fetchAll(); });
+loadProductions();
 setInterval(fetchAll,5000);
 </script>
 </body>
