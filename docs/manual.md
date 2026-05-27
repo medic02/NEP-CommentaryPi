@@ -2,7 +2,7 @@
 
 **Oppsett | Tilkobling | Programvare | Vedlikehold og Feilsøking**
 
-Versjon 2.0 | Mai 2026 | Intern / Teknisk  
+Versjon 2.1 | Mai 2026 | Intern / Teknisk  
 Kun for internt bruk av NEP teknisk personell.
 
 ---
@@ -369,6 +369,65 @@ Trykk **Administrer** for å legge til, redigere eller slette enheter fra dashbo
 - **Pi** — Satelitt Pi med LAN- og Tailscale-IP
 - **Switch, Ruter, Videohub, Annen enhet** — overvåkes med ping
 
+### 9.6 Varsler (Pushover)
+
+Trykk **🔔 Varsler** i topmenyen for å konfigurere Pushover-varsler.
+
+| Felt | Beskrivelse |
+|---|---|
+| App Token | Pushover applikasjonsnøkkel |
+| User Key | Pushover brukernøkkel |
+| Varsler aktivert | Master-toggle — slår av/på alle varsler |
+| Send testmelding | Sender en testmelding for å verifisere oppsettet |
+
+**Varseltyper (per type hendelse):**
+
+| Toggle | Hendelse |
+|---|---|
+| 🔴 Pi går offline | Enhet er ikke lenger nåbar |
+| ✅ Pi online igjen | Enhet er tilbake etter bortfall |
+| ⚠️ Satellite frakoblet | Companion satellite mistet tilkobling |
+| ✅ Satellite tilkoblet igjen | Satellite reconnectet |
+| 🌡️ Høy temperatur | Pi overskrider temp-grense |
+| ⚡ Byttet til Tailscale | Pi mistet LAN og kjører via VPN |
+| ✅ Tilbake på LAN | Pi er tilbake på lokalt nett |
+
+**Per-enhet toggles:**  
+Nederst i varslingssiden vises alle enheter fra dashbordet. Du kan skru av/på varsler individuelt per enhet — nyttig hvis en switch er kjent ustabil men du ikke vil ha varsel for den.
+
+**Temperaturgrenser:**
+- **Varsel over** — send varsel når Pi når denne temperaturen (standard: 75°C)
+- **OK under** — send «temp normal»-varsel når Pi faller under denne (standard: 65°C)
+
+> ℹ️ **MERK:** Innstillingene lagres på Companion Pi i `/home/pi/health/notifications-config.json` og leses av watchdog-tjenesten umiddelbart uten restart.
+
+### 9.7 Kollapserbare kort og seksjoner
+
+For å spare skjermplass kan alt på dashbordet kollapsas:
+
+- **Pi-kort** — klikk på korthodet (toppen med navn og statusindikator) for å skjule/vise hele innholdet
+- **Seksjoner** — klikk på seksjonsoverskriften (Companion / Nettverk / Failover / System) for å kollapse den seksjonen på alle Pi-kort samtidig
+- **Device-kort** (Switch, Videohub osv.) — klikk hvor som helst på kortet for å kollapse til minimal visning
+
+Alle kollapsevalg huskes automatisk i nettleseren til neste gang.
+
+### 9.8 Produksjonsvelger
+
+🎬-knappen i topbaren lar deg lagre ulike **produksjoner** — hver produksjon husker sin egen liste med enheter som overvåkes. Nyttig når du bruker det samme kitet til forskjellige oppdrag med ulike enheter.
+
+**Slik bruker du produksjonsvelgeren:**
+
+| Handling | Beskrivelse |
+|---|---|
+| Klikk 🎬-knappen | Åpner dropdown med alle produksjoner — aktiv produksjon er merket med ✓ |
+| Velg en produksjon | Dashbordet bytter til den produksjonens enhetsliste umiddelbart |
+| ＋ Ny produksjon | Oppretter en ny produksjon og lagrer de nåværende enhetene i den |
+| ⚙ Administrer produksjoner | Åpner oversikt — gi nytt navn, aktiver eller slett produksjoner |
+
+> ℹ️ **MERK:** Produksjoner lagres på Companion Pi i `/home/pi/health/productions.json`. Minst én produksjon må alltid finnes — siste produksjon kan ikke slettes.
+
+> ✅ **TIPS:** Lag én produksjon per venue eller oppdragstype (f.eks. «Bodø», «Oslo», «Test-rigg») og bytt enkelt mellom dem når du rigger opp.
+
 ---
 
 ## 10. VEDLIKEHOLD OG OPPDATERING
@@ -396,6 +455,36 @@ Velg Pi-nummer (1–6) når du blir spurt. Scriptet installerer:
 ```bash
 sudo tailscale up
 ```
+
+### Companion Pi — Database i RAM (ytelsesoptimalisering)
+
+Companion lagrer sin database (~80 MB) og tar periodisk backup. På SD-kort blokkerte dette Node.js event loop i 3–6 sekunder, noe som fikk alle satelitt-Pi-er til å droppe tilkoblingen samtidig.
+
+**Løsning installert på Companion Pi:**
+- Companion-databasen kjører fra RAM (tmpfs) istedenfor SD-kort/USB
+- Synkroniseres til USB-disken hvert 5. minutt automatisk
+- Backup-tid: fra ~5800 ms → under 50 ms
+
+**USB-disk:** Samsung FIT Plus 64 GB — montert på `/home/companion`  
+**RAM-database:** Montert på `/home/companion/.config/companion-nodejs/v4.3`
+
+**Verifiser at fiksen fungerer:**
+```bash
+journalctl -u companion --since "1 hour ago" | grep "backup complete"
+# Skal vise: "backup complete in XXms" — forventet under 100 ms
+```
+
+**Sjekk status på RAM-database-tjenestene:**
+```bash
+systemctl status companion-ramdb companion-ramdb-sync.timer
+```
+
+**Manuell sync til USB (f.eks. før planlagt strømstans):**
+```bash
+sudo /usr/local/sbin/companion-ramdb-sync.sh
+```
+
+> ⚠️ **VIKTIG:** Ved uplanlagt strømstans på Companion Pi kan maksimalt 5 minutter med konfigurasjonsendringer gå tapt. Companion-databasen synkes automatisk hvert 5. minutt, og ved normal nedstengning synkes den alltid til USB.
 
 ### Installer Health API på Companion Pi (uten satellite)
 
