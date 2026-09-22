@@ -1,0 +1,14 @@
+[Unit]
+Description=Companion RAM database
+Before=companion.service
+After=local-fs.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/companion-ramdb-load.sh
+ExecStop=/usr/local/sbin/companion-ramdb-stop.sh
+
+[Install]
+WantedBy=multi-user.target

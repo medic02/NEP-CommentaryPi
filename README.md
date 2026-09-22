@@ -17,6 +17,8 @@ nep-kommentatorkit/
 │   └── nep-ts-failover.timer
 ├── health/
 │   └── health.py                     # Health API (port 8080)
+├── companion/
+│   └── ...                           # RAM-database for Companion Pi (se companion/README.md)
 └── assets/
     └── nep-logo.png                  # NEP-logo for Stream Deck splash
 ```
@@ -75,3 +77,12 @@ systemctl status nep-health nep-iprule nep-ts-failover.timer
 
 Legg `nep-logo.png` i `assets/`-mappen i repoet.
 Scriptet kopierer den til `/opt/companion-satellite/satellite/assets/icon.png`.
+
+## Companion Pi — RAM-database
+
+Companion Pi (hoved-noden, ikke Satelitt Pi-ene) har en separat,
+manuelt installert fiks for å unngå at periodiske databasebackuper
+blokkerer Node.js sin event loop og dropper alle Satelitt Pi-er
+samtidig. Se [`companion/README.md`](companion/README.md) — inkludert
+en kjent regresjon som dukker opp igjen ved hver `companion-update`
+med mindre `companion-ramdb.service` restartes etterpå.

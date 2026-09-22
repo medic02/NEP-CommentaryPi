@@ -1,0 +1,7 @@
+[Unit]
+Description=Sync Companion database to USB
+After=companion-ramdb.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/companion-ramdb-sync.sh
