@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="transparent" content="true" />
+    <title>Matrix Rain</title>
+  <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+
+        let W = 0,
+          H = 0
+        let lastTime = 0
+        let charSize = 0
+        let cols = []
+
+        const MAX_CHARS = 28
+        const TRAIL_BASE = 0.84 // each step back multiplies opacity by this
+
+        const NEP_COLORS = [
+          { r: 187, g: 0, b: 153 },
+          { r: 238, g: 0, b: 0 },
+          { r: 255, g: 133, b: 0 },
+          { r: 255, g: 204, b: 0 },
+          { r: 102, g: 204, b: 0 },
+          { r: 0, g: 183, b: 212 },
+          { r: 0, g: 144, b: 255 },
+          { r: 0, g: 96, b: 204 },
+          { r: 255, g: 255, b: 255 },
+        ]
+
+        function randomNepColor() {
+          return NEP_COLORS[Math.floor(Math.random() * NEP_COLORS.length)]
+        }
+
+        const GLYPHS = 'NEP'
+
+        function nextGlyph(col) {
+          col.glyphIndex = (col.glyphIndex + 1) % GLYPHS.length
+          return GLYPHS[col.glyphIndex]
+        }
+
+        class Column {
+          constructor(x, mode) {
+            this.mode = mode || 'single'
+            this.glyphIndex = -1
+            this.x = x
+            this.head = Math.random() * -H
+            this.speed = 100 + Math.random() * 200
+            this.chars = []
+            this.nextDrop = 0
+            this.dropInterval = 0.06 + Math.random() * 0.08
+            this.setColor(randomNepColor())
+          }
+
+          setColor(c) {
+            this.color = c
+            this.headColor =
+              'rgb(' +
+              Math.min(255, c.r + 40) +
+              ',' +
+              Math.min(255, c.g + 40) +
+              ',' +
+              Math.min(255, c.b + 40) +
+              ')'
+            this.tailColor = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'
+          }
+
+          update(dt) {
+            this.head += this.speed * dt
+            this.nextDrop -= dt
+            if (this.nextDrop <= 0 && this.head < H + charSize) {
+              this.chars.push({
+                y: this.head,
+                glyph: this.mode === 'word' ? 'NEP' : nextGlyph(this),
+              })
+              this.nextDrop = this.dropInterval
+            }
+
+            while (this.chars.length > MAX_CHARS) this.chars.shift()
+
+            if (this.head > H + charSize * 2) {
+              this.head = -charSize
+            }
+          }
+
+          draw(ctx) {
+            let len = this.chars.length
+            if (len === 0) return
+
+            // Tail: opacity decays exponentially from head
+            for (let i = 0; i < len - 1; i++) {
+              let ch = this.chars[i]
+              if (ch.y < -charSize || ch.y > H + charSize) continue
+              let dist = len - 1 - i
+              let alpha = Math.pow(TRAIL_BASE, dist)
+              if (alpha < 0.02) continue
+              ctx.fillStyle = this.tailColor
+              ctx.globalAlpha = alpha
+              ctx.fillText(ch.glyph, this.x, ch.y)
+            }
+
+            // Head: brightest
+            let head = this.chars[len - 1]
+            ctx.fillStyle = this.headColor
+            ctx.globalAlpha = 1
+            ctx.fillText(head.glyph, this.x, head.y)
+
+            ctx.globalAlpha = 1
+          }
+        }
+
+        function resize() {
+          W = window.innerWidth
+          H = window.innerHeight
+          resizeCanvas(canvas, ctx, dpr, W, H)
+
+          charSize = Math.max(18, Math.round(W * 0.022))
+          ctx.font = 'bold ' + charSize + 'px monospace'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'top'
+
+          const colSpacing = charSize * 3
+          const numCols = Math.floor(W / colSpacing)
+
+          cols = []
+          for (let i = 0; i < numCols; i++) {
+            const mode = i % 5 === 0 ? 'word' : 'single'
+            cols.push(new Column(i * colSpacing + colSpacing / 2, mode))
+          }
+        }
+
+        resize()
+        window.addEventListener('resize', resize)
+
+        requestAnimationFrame(loop)
+
+        function loop(timestamp) {
+          if (lastTime === 0) lastTime = timestamp
+          const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
+          lastTime = timestamp
+
+          ctx.clearRect(0, 0, W, H)
+
+          for (let i = 0; i < cols.length; i++) {
+            cols[i].update(dt)
+            cols[i].draw(ctx)
+          }
+
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+  </body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="transparent" content="true" />
+    <title>Pulse</title>
+  <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+
+        const img = new Image()
+        let aspect = 1.0
+        let W = 0, H = 0
+        let lastTime = 0
+        let baseW = 0, baseH = 0
+
+        const BREATH_PERIOD = 4.5  // seconds per full breath cycle
+        const SCALE_MIN = 0.7
+        const SCALE_MAX = 2.2
+        const OPACITY_MIN = 0.75
+        const OPACITY_MAX = 1.0
+
+        function resize() {
+          W = window.innerWidth
+          H = window.innerHeight
+          resizeCanvas(canvas, ctx, dpr, W, H)
+
+          baseW = Math.round(W * 0.15)
+          baseH = Math.round(baseW / aspect)
+        }
+
+        img.onload = () => {
+          aspect = img.naturalWidth / img.naturalHeight
+          resize()
+          requestAnimationFrame(loop)
+        }
+
+        img.onerror = () => {
+          aspect = 645 / 342
+          resize()
+          requestAnimationFrame(loop)
+        }
+
+        img.src = './NEP-Logo-FC-WHITE-RGB.png'
+        window.addEventListener('resize', resize)
+
+        function loop(timestamp) {
+          if (lastTime === 0) lastTime = timestamp
+          const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
+          lastTime = timestamp
+
+          // Smooth sine-wave breath
+          const phase = (timestamp / 1000) / BREATH_PERIOD * Math.PI * 2
+          const t = (Math.sin(phase) + 1) / 2  // 0..1
+          const scale = SCALE_MIN + (SCALE_MAX - SCALE_MIN) * t
+          const opacity = OPACITY_MIN + (OPACITY_MAX - OPACITY_MIN) * t
+
+          const drawW = Math.round(baseW * scale)
+          const drawH = Math.round(baseH * scale)
+
+          ctx.clearRect(0, 0, W, H)
+          ctx.globalAlpha = opacity
+
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, (W - drawW) / 2, (H - drawH) / 2, drawW, drawH)
+          } else {
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect((W - drawW) / 2, (H - drawH) / 2, drawW, drawH)
+          }
+
+          ctx.globalAlpha = 1
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+  </body>
+</html>
