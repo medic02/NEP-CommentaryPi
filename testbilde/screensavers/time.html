@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="transparent" content="true" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clock</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .help {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        font-family: monospace;
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .help.visible {
+        display: flex;
+      }
+      .help h2 {
+        font-size: 1.8rem;
+        font-weight: 300;
+        opacity: 0.8;
+        margin: 0;
+      }
+      .help table {
+        border-collapse: collapse;
+        font-size: 1rem;
+      }
+      .help td {
+        padding: 0.5rem 1rem;
+      }
+      .help td:first-child {
+        color: #fc0;
+        white-space: nowrap;
+      }
+      .help td:last-child {
+        opacity: 0.65;
+      }
+      .help .hint {
+        font-size: 0.8rem;
+        opacity: 0.35;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="help" id="help">
+      <h2>Clock Options</h2>
+      <table>
+        <tr>
+          <td>?offset=+2</td>
+          <td>Show UTC+2 (any float)</td>
+        </tr>
+        <tr>
+          <td>?format=12</td>
+          <td>12-hour with AM/PM</td>
+        </tr>
+        <tr>
+          <td>?date=short</td>
+          <td>Show short date</td>
+        </tr>
+        <tr>
+          <td>?date=full</td>
+          <td>Show full date</td>
+        </tr>
+        <tr>
+          <td>?seconds=false</td>
+          <td>Hide seconds</td>
+        </tr>
+        <tr>
+          <td>?tz=short</td>
+          <td>Show timezone (short, long, etc)</td>
+        </tr>
+        <tr>
+          <td>?transparent=true</td>
+          <td>Transparent background</td>
+        </tr>
+      </table>
+      <p class="hint">Press ? or Esc to close</p>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+        const help = document.getElementById('help')
+        let W = 0,
+          H = 0
+
+        window.addEventListener('keydown', function (e) {
+          if (e.key === '?') {
+            help.classList.toggle('visible')
+            e.preventDefault()
+          }
+          if (e.key === 'Escape') help.classList.remove('visible')
+        })
+
+        const params = new URLSearchParams(window.location.search)
+        const showDate = (params.get('date') || 'false') === 'false' ? null : params.get('date')
+        const showSeconds = params.get('seconds') !== 'false'
+        const format24 = params.get('format') !== '12'
+        const hasOffset = params.has('offset')
+        const offset = hasOffset ? parseFloat(params.get('offset')) : 0
+        const rawTz = params.get('tz')
+        const tzStyle = !rawTz || rawTz === 'false' ? (hasOffset ? 'short' : null) : rawTz
+
+        function getTime(now) {
+          let h, m, s
+          if (hasOffset) {
+            const u = new Date(now.getTime() + offset * 3600000)
+            h = u.getUTCHours()
+            m = u.getUTCMinutes()
+            s = u.getUTCSeconds()
+          } else {
+            h = now.getHours()
+            m = now.getMinutes()
+            s = now.getSeconds()
+          }
+          const ampm = h >= 12 ? 'PM' : 'AM'
+          if (!format24) h = h % 12 || 12
+          const timeStr = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0')
+          const ss = String(s).padStart(2, '0')
+          const suffix = format24 ? '' : ' ' + ampm
+
+          let dateStr = ''
+          if (showDate) {
+            const isFull = showDate === 'full' || showDate === 'long'
+            if (hasOffset) {
+              const du = new Date(now.getTime() + offset * 3600000)
+              dateStr = new Intl.DateTimeFormat(
+                undefined,
+                isFull
+                  ? {
+                      timeZone: 'UTC',
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    }
+                  : { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }
+              ).format(du)
+            } else {
+              dateStr = now.toLocaleDateString(
+                undefined,
+                isFull
+                  ? { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+                  : { year: 'numeric', month: 'short', day: 'numeric' }
+              )
+            }
+          }
+
+          let tzLabel = ''
+          if (tzStyle) {
+            if (hasOffset) {
+              const sign = offset >= 0 ? '+' : ''
+              tzLabel = 'UTC' + (offset === 0 ? '' : sign + offset)
+            } else {
+              tzLabel =
+                new Intl.DateTimeFormat(undefined, { timeZoneName: tzStyle })
+                  .formatToParts(now)
+                  .find(p => p.type === 'timeZoneName')?.value || ''
+            }
+          }
+
+          return { timeStr, suffix, ss, dateStr, tzLabel }
+        }
+
+        let lastSecond = -1,
+          cached = null
+
+        function resize() {
+          W = window.innerWidth
+          H = window.innerHeight
+          resizeCanvas(canvas, ctx, dpr, W, H)
+        }
+        resize()
+        window.addEventListener('resize', resize)
+        requestAnimationFrame(loop)
+
+        function loop() {
+          const now = new Date()
+          const sec = now.getSeconds()
+          if (sec !== lastSecond) {
+            lastSecond = sec
+            cached = getTime(now)
+          }
+
+          ctx.clearRect(0, 0, W, H)
+          ctx.fillStyle = '#ffffff'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+
+          const cy = H / 2
+          const timeSize = Math.round(Math.min(W * 0.13, H * 0.2))
+
+          const fullLine = cached.timeStr + (showSeconds ? ':' + cached.ss : '') + cached.suffix
+          ctx.font = '300 ' + timeSize + 'px monospace'
+          ctx.globalAlpha = 0.95
+          ctx.fillText(fullLine, W / 2, cy - timeSize * 0.1)
+
+          if (showSeconds) {
+            const fullW = ctx.measureText(fullLine).width
+            const secStr = ':' + cached.ss
+            const suffixW = ctx.measureText(cached.suffix).width
+            const secW = ctx.measureText(secStr).width
+            ctx.globalAlpha = 0.45
+            ctx.fillText(secStr, W / 2 + fullW / 2 - suffixW - secW + secW / 2, cy - timeSize * 0.1)
+          }
+
+          if (cached.dateStr) {
+            const ds = Math.round(timeSize * 0.25)
+            ctx.font = '300 ' + ds + 'px monospace'
+            ctx.globalAlpha = 0.45
+            ctx.fillText(cached.dateStr, W / 2, cy + timeSize * 0.55)
+          }
+
+          if (cached.tzLabel) {
+            const ts = Math.round(timeSize * 0.18)
+            ctx.font = ts + 'px monospace'
+            ctx.globalAlpha = 0.3
+            ctx.fillText(
+              cached.tzLabel,
+              W / 2,
+              cy + timeSize * 0.55 + (cached.dateStr ? timeSize * 0.4 : 0)
+            )
+          }
+
+          ctx.globalAlpha = 1
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+  </body>
+</html>

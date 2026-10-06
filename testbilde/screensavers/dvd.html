@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="transparent" content="true" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DVD Screensaver</title>
+  <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+
+        const img = new Image()
+        let imgLoaded = false
+
+        // State
+        let x = 0,
+          y = 0
+        let dx = 0,
+          dy = 0
+        let drawW = 0,
+          drawH = 0
+        let lastTime = 0
+        const BASE_SPEED = 300 // pixels per second
+
+        function perturbOnBounce(dx, dy, nearCorner) {
+          // Rotate velocity: ±25° normally, ±35° when near a corner
+          const angleRange = nearCorner ? 35 : 25
+          const angleJitter = wobble(-angleRange, angleRange) * (Math.PI / 180)
+          const cos = Math.cos(angleJitter)
+          const sin = Math.sin(angleJitter)
+          const ndx = dx * cos - dy * sin
+          const ndy = dx * sin + dy * cos
+          // Speed change: ±30% normally, ±50% near corners (real DVD chaos)
+          const speedRange = nearCorner ? 0.5 : 0.3
+          const mag = Math.sqrt(ndx * ndx + ndy * ndy)
+          const newMag = BASE_SPEED * wobble(1 - speedRange, 1 + speedRange)
+          const scale = newMag / mag
+          return { dx: ndx * scale, dy: ndy * scale }
+        }
+
+        // ── Image loading ──────────────────────────────────
+
+        img.onload = () => {
+          imgLoaded = true
+          initSize()
+        }
+
+        img.onerror = () => {
+          console.error('Logo failed to load from:', img.src)
+          imgLoaded = false
+          initSize()
+        }
+
+        img.src = './NEP-Logo-FC-WHITE-RGB.png'
+
+        // ── Sizing ────────────────────────────────────────
+
+        window.addEventListener('resize', initSize)
+
+        function initSize() {
+          resizeCanvas(canvas, ctx, dpr, window.innerWidth, window.innerHeight)
+
+          if (imgLoaded) {
+            const aspect = img.naturalWidth / img.naturalHeight
+            drawW = Math.round(window.innerWidth * 0.22)
+            drawH = Math.round(drawW / aspect)
+            if (drawW >= window.innerWidth) {
+              drawW = Math.max(window.innerWidth - 20, 20)
+              drawH = Math.round(drawW / aspect)
+            }
+            if (drawH >= window.innerHeight) {
+              drawH = Math.max(window.innerHeight - 20, 20)
+              drawW = Math.round(drawH * aspect)
+            }
+          } else {
+            drawW = Math.round(window.innerWidth * 0.22)
+            drawH = Math.round(drawW / (645 / 342))
+          }
+
+          x = Math.min(Math.max(x, 0), window.innerWidth - drawW)
+          y = Math.min(Math.max(y, 0), window.innerHeight - drawH)
+
+          if (dx === 0 && dy === 0) {
+            dx = (Math.random() > 0.5 ? 1 : -1) * BASE_SPEED
+            dy = (Math.random() > 0.5 ? 1 : -1) * BASE_SPEED
+          }
+        }
+
+        // ── Animation loop ────────────────────────────────
+
+        initSize()
+        requestAnimationFrame(loop)
+
+        function loop(timestamp) {
+          if (lastTime === 0) lastTime = timestamp
+          const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
+          lastTime = timestamp
+
+          x += dx * dt
+          y += dy * dt
+
+          const cornerMargin = Math.min(window.innerWidth, window.innerHeight) * 0.12
+          let nc
+
+          if (x <= 0) {
+            x = 0; dx = Math.abs(dx)
+            nc = y < cornerMargin || y + drawH > window.innerHeight - cornerMargin
+            ;({ dx, dy } = perturbOnBounce(dx, dy, nc))
+          }
+          if (y <= 0) {
+            y = 0; dy = Math.abs(dy)
+            nc = x < cornerMargin || x + drawW > window.innerWidth - cornerMargin
+            ;({ dx, dy } = perturbOnBounce(dx, dy, nc))
+          }
+          if (x + drawW >= window.innerWidth) {
+            x = window.innerWidth - drawW; dx = -Math.abs(dx)
+            nc = y < cornerMargin || y + drawH > window.innerHeight - cornerMargin
+            ;({ dx, dy } = perturbOnBounce(dx, dy, nc))
+          }
+          if (y + drawH >= window.innerHeight) {
+            y = window.innerHeight - drawH; dy = -Math.abs(dy)
+            nc = x < cornerMargin || x + drawW > window.innerWidth - cornerMargin
+            ;({ dx, dy } = perturbOnBounce(dx, dy, nc))
+          }
+
+          // Gentle organic drift between bounces
+          dx += wobble(-2, 2) * dt
+          dy += wobble(-2, 2) * dt
+
+          ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
+
+          if (imgLoaded) {
+            ctx.drawImage(img, x, y, drawW, drawH)
+          } else {
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(x, y, drawW, drawH)
+            ctx.fillStyle = '#000000'
+            ctx.font = '14px monospace'
+            ctx.fillText('loading…', x + 8, y + 22)
+          }
+
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+
+</html>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="transparent" content="true" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flying Toasters</title>
+  <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+
+        const img = new Image()
+        let aspect = 1.0
+        let W = 0,
+          H = 0
+        let lastTime = 0
+
+        const FLYER_COUNT = 12
+        const DEPTHS = []
+        for (let i = 0; i < FLYER_COUNT; i++) {
+          const t = i / (FLYER_COUNT - 1)
+          DEPTHS.push({
+            scaleMin: 0.03 + t * 0.15,
+            scaleMax: 0.08 + t * 0.24,
+            speed: 0.08 + t * 0.16,
+          })
+        }
+
+        function createFlyer(depth, crossCenter) {
+          return {
+            depth: DEPTHS[depth],
+            t: Math.random(),
+            startX: 0,
+            startY: 0,
+            endX: 0,
+            endY: 0,
+            crossCenter: crossCenter,
+          }
+        }
+
+        const flyers = DEPTHS.map((_, i) => createFlyer(i, i >= 8))
+
+        // ── Path generation ────────────────────────────────
+
+        function edgePoint(edge) {
+          switch (edge) {
+            case 0:
+              return { x: Math.random() * W, y: 0 } // top
+            case 1:
+              return { x: W, y: Math.random() * H } // right
+            case 2:
+              return { x: Math.random() * W, y: H } // bottom
+            case 3:
+              return { x: 0, y: Math.random() * H } // left
+          }
+        }
+
+        function newPath(flyer) {
+          // Pick two different random edges
+          const edges = [0, 1, 2, 3]
+          const i1 = Math.floor(Math.random() * 4)
+          const e1 = edges[i1]
+          edges.splice(i1, 1)
+          const e2 = edges[Math.floor(Math.random() * 3)]
+
+          if (flyer.crossCenter) {
+            // Opposite edges — guaranteed to cross the middle
+            const axis = Math.floor(Math.random() * 2)
+            if (axis === 0) {
+              flyer.startX = Math.random() * W
+              flyer.startY = 0
+              flyer.endX = Math.random() * W
+              flyer.endY = H
+            } else {
+              flyer.startX = 0
+              flyer.startY = Math.random() * H
+              flyer.endX = W
+              flyer.endY = Math.random() * H
+            }
+          } else {
+            const s = edgePoint(e1)
+            const e = edgePoint(e2)
+            flyer.startX = s.x
+            flyer.startY = s.y
+            flyer.endX = e.x
+            flyer.endY = e.y
+          }
+          flyer.t = 0
+        }
+
+        function resize() {
+          W = window.innerWidth
+          H = window.innerHeight
+          resizeCanvas(canvas, ctx, dpr, W, H)
+          flyers.forEach(f => newPath(f))
+        }
+
+        function drawFlyer(flyer) {
+          const d = flyer.depth
+          const x = flyer.startX + (flyer.endX - flyer.startX) * flyer.t
+          const y = flyer.startY + (flyer.endY - flyer.startY) * flyer.t
+
+          const depthT = Math.sin(flyer.t * Math.PI)
+          const scale = d.scaleMin + (d.scaleMax - d.scaleMin) * depthT
+
+          const logoW = Math.round(W * scale)
+          const logoH = Math.round(logoW / aspect)
+          const cx = x
+          const cy = y + Math.sin(flyer.t * Math.PI * 4) * H * 0.01
+
+          const dx = flyer.endX - flyer.startX
+          const dy = flyer.endY - flyer.startY
+          const tilt = Math.atan2(dy, dx) * 0.08
+
+          ctx.save()
+          ctx.translate(cx, cy)
+          ctx.rotate(tilt)
+
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, -logoW / 2, -logoH / 2, logoW, logoH)
+          } else {
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(-logoW / 2, -logoH / 2, logoW, logoH)
+          }
+
+          ctx.restore()
+        }
+
+        img.onload = () => {
+          aspect = img.naturalWidth / img.naturalHeight
+          resize()
+          requestAnimationFrame(loop)
+        }
+
+        img.onerror = () => {
+          aspect = 645 / 342
+          resize()
+          requestAnimationFrame(loop)
+        }
+
+        img.src = './NEP-Logo-FC-WHITE-RGB.png'
+        window.addEventListener('resize', resize)
+
+        function loop(timestamp) {
+          if (lastTime === 0) lastTime = timestamp
+          const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
+          lastTime = timestamp
+
+          for (const f of flyers) {
+            f.t += f.depth.speed * dt
+            if (f.t > 1) {
+              f.t = 0
+              newPath(f)
+            }
+          }
+
+          const sorted = [...flyers].sort((a, b) => {
+            const sa =
+              a.depth.scaleMin + (a.depth.scaleMax - a.depth.scaleMin) * Math.sin(a.t * Math.PI)
+            const sb =
+              b.depth.scaleMin + (b.depth.scaleMax - b.depth.scaleMin) * Math.sin(b.t * Math.PI)
+            return sa - sb
+          })
+
+          ctx.clearRect(0, 0, W, H)
+          for (const f of sorted) {
+            drawFlyer(f)
+          }
+
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+  </body>
+</html>

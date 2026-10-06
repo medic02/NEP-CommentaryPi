@@ -1,0 +1,951 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Testbilde — Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0d1013; --panel:#171b20; --panel-2:#1e242b; --border:#2a323b;
+    --text:#e7ecf1; --text-dim:#8d99a6; --text-faint:#5c6672;
+    --accent:#ff9c1a; --accent-dim:#5c4322; --accent-2:#33c9e0;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',-apple-system,sans-serif;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);margin:0;padding:16px;padding-bottom:40px;}
+  h1{font-family:var(--mono);font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 4px;}
+  h1 span{color:var(--accent);}
+  .status{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-bottom:18px;display:flex;align-items:center;gap:6px;}
+  .status .dot{width:7px;height:7px;border-radius:50%;background:#3a4b3f;}
+  .status.ok .dot{background:#3fcf5f;box-shadow:0 0 6px #3fcf5f;}
+  .status.bad .dot{background:#e0533f;box-shadow:0 0 6px #e0533f;}
+  .modebar{display:flex;gap:8px;margin-bottom:20px;}
+  .modebtn{flex:1;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+    background:var(--panel);border:1px solid var(--border);color:var(--text-dim);padding:12px 10px;border-radius:4px;}
+  .modebtn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);}
+  .section{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:14px;}
+  .section-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent-2);
+    text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:8px;margin:0 0 14px;}
+  .field{margin-bottom:14px;}
+  .field:last-child{margin-bottom:0;}
+  label.l{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--text-faint);margin-bottom:6px;}
+  select,input[type=text],input[type=color]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    font-family:var(--sans);font-size:15px;padding:11px 10px;border-radius:4px;}
+  select:focus,input:focus{outline:none;border-color:var(--accent-2);}
+  .radiorow{display:flex;gap:8px;}
+  .radiorow label{flex:1;text-align:center;font-family:var(--mono);font-size:12px;padding:10px 6px;
+    border:1px solid var(--border);border-radius:4px;color:var(--text-dim);}
+  .radiorow input{position:absolute;opacity:0;}
+  .radiorow label.checked{border-color:var(--accent-2);color:var(--accent-2);background:#12303a;}
+  .switchrow{display:flex;align-items:center;justify-content:space-between;}
+  .switch{position:relative;width:44px;height:24px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;flex-shrink:0;}
+  .switch .knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--text-faint);transition:transform .15s,background .15s;}
+  .switch.on{border-color:var(--accent);}
+  .switch.on .knob{transform:translateX(20px);background:var(--accent);}
+  .logoslot{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px dashed var(--border);border-radius:4px;padding:10px;}
+  .logoslot .preview{width:40px;height:40px;border-radius:4px;background:#000;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+  .logoslot .preview img{max-width:100%;max-height:100%;}
+  .logoslot input[type=file]{display:none;}
+  .logoslot .fname{font-family:var(--mono);font-size:11px;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .uploadbtn{font-family:var(--mono);font-size:11px;background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    padding:8px 12px;border-radius:4px;flex-shrink:0;}
+  .slidergroup{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;accent-color:var(--accent-2);height:28px;}
+  .sliderval{font-family:var(--mono);font-size:12px;color:var(--text-dim);width:38px;text-align:right;}
+  .elrow{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:8px;}
+  .elrow .elhead{display:flex;align-items:center;gap:8px;}
+  .elrow .eltype{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-2);flex:1;}
+  .elrow .elremove{font-family:var(--mono);font-size:10px;background:transparent;border:1px solid var(--border);color:var(--text-faint);padding:4px 8px;border-radius:3px;}
+  .elrow input[type=text]{font-size:13px;padding:8px;}
+  .elrow .elgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .elrow .elgrid label{font-family:var(--mono);font-size:9px;color:var(--text-faint);display:block;margin-bottom:3px;}
+  .elrow .elgrid input[type=range]{width:100%;height:20px;}
+  .elrow .elgrid .v{font-family:var(--mono);font-size:9px;color:var(--text-dim);}
+  .elrow .elpreview{width:32px;height:32px;border-radius:3px;background:#000;border:1px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .elrow .elpreview img{max-width:100%;max-height:100%;}
+  .presetsave{display:flex;gap:8px;margin-bottom:12px;}
+  .presetsave input{flex:1;}
+  .presetsave button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:0 16px;border-radius:4px;flex-shrink:0;}
+  .presetrow{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:8px 10px;margin-bottom:8px;}
+  .presetrow:last-child{margin-bottom:0;}
+  .presetrow .pname{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .presetrow button{font-family:var(--mono);font-size:10.5px;background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:7px 10px;border-radius:3px;flex-shrink:0;}
+  .presetrow .pload{border-color:var(--accent-2);color:var(--accent-2);}
+  .presetrow .pdelete{color:var(--text-faint);}
+  .presetempty{font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+  .presetthumb{width:28px;height:28px;border-radius:3px;background:#000;border:1px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .presetthumb img{max-width:100%;max-height:100%;}
+  .presetrow .pload:disabled{opacity:.5;}
+</style>
+</head>
+<body>
+
+<h1>NEP <span>Testbilde</span> — Admin</h1>
+<div class="status" id="status"><span class="dot"></span><span id="statusText">Kobler til...</span></div>
+
+<div class="modebar">
+  <button class="modebtn" data-mode="bars">Fargestolper</button>
+  <button class="modebtn" data-mode="bounce">Sprett-logo</button>
+  <button class="modebtn" data-mode="screensaver">Skjermsparer</button>
+</div>
+
+<div class="section" id="panelPresets">
+  <p class="section-title">Mine design</p>
+  <div class="presetsave">
+    <input type="text" id="presetName" placeholder="Navn på design, f.eks. «Derby hjemme»">
+    <button id="btnSavePreset">Lagre</button>
+  </div>
+  <div id="presetList"><p class="presetempty">Ingen lagrede design ennå.</p></div>
+</div>
+
+<div class="section">
+  <p class="section-title">Format</p>
+  <select id="format">
+    <option value="1080i60">1080i60 — ekte interlace-signal</option>
+    <option value="1080i50">1080i50 — ekte interlace-signal</option>
+    <option value="1080p60">1080p60 — progressiv (anbefalt til sprett-logo)</option>
+    <option value="1080p50">1080p50 — progressiv</option>
+    <option value="720p60">720p60 — progressiv</option>
+    <option value="720p50">720p50 — progressiv</option>
+    <option value="576i50">576i50 (PAL) — ekte interlace-signal</option>
+    <option value="576p50">576p50 (PAL) — progressiv</option>
+  </select>
+  <div class="hint" style="font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:8px;">
+    Dette bytter faktisk skjermmodus på HDMI-utgangen (xrandr), ikke bare bildestørrelsen.
+  </div>
+</div>
+
+<div class="section" id="panelBars">
+  <p class="section-title">Fargestolper</p>
+  <div class="field">
+    <label class="l">Mønster</label>
+    <select id="barsPattern">
+      <option value="smpte">SMPTE 75% bars</option>
+      <option value="full">Full Field 100% bars</option>
+      <option value="ramp">Gråtoner (11-trinn)</option>
+      <option value="custom">Egendefinert (bygg selv)</option>
+    </select>
+  </div>
+  <div id="panelBarsStandard">
+    <div class="field switchrow">
+      <label class="l" style="margin:0;">Tekstoverlegg</label>
+      <div class="switch" id="swText"><div class="knob"></div></div>
+    </div>
+    <div class="field"><label class="l">Arena (stor tittel)</label><input type="text" id="arena"></div>
+    <div class="field"><label class="l">Ekstra linje</label><input type="text" id="ekstra"></div>
+    <div class="field"><label class="l">Dato</label><input type="text" id="dato"></div>
+
+    <div class="field switchrow">
+      <label class="l" style="margin:0;">Klokke</label>
+      <div class="switch" id="swClock"><div class="knob"></div></div>
+    </div>
+    <div id="clockFields" style="display:none; flex-direction:column; gap:10px; margin-bottom:14px;">
+      <div class="field"><label class="l">Farge</label><input type="color" id="clockColor"></div>
+      <div class="elgrid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">X %</label><input type="range" id="clockX" min="0" max="100" style="width:100%; height:20px;"><div class="v" id="clockXVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">Y %</label><input type="range" id="clockY" min="0" max="100" style="width:100%; height:20px;"><div class="v" id="clockYVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">Storrelse %</label><input type="range" id="clockSize" min="2" max="15" style="width:100%; height:20px;"><div class="v" id="clockSizeVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+      </div>
+    </div>
+
+    <div class="field switchrow">
+      <label class="l" style="margin:0;">Nedtelling til kickoff</label>
+      <div class="switch" id="swCountdown"><div class="knob"></div></div>
+    </div>
+    <div id="countdownFields" style="display:none; flex-direction:column; gap:10px;">
+      <div class="field"><label class="l">Kampstart (dato og klokkeslett)</label><input type="datetime-local" id="countdownTarget" lang="nb-NO"></div>
+      <div class="field"><label class="l">Tekst</label><input type="text" id="countdownLabel"></div>
+      <div class="field"><label class="l">Farge</label><input type="color" id="countdownColor"></div>
+      <div class="elgrid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">X %</label><input type="range" id="countdownX" min="0" max="100" style="width:100%; height:20px;"><div class="v" id="countdownXVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">Y %</label><input type="range" id="countdownY" min="0" max="100" style="width:100%; height:20px;"><div class="v" id="countdownYVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">Tekst "Tid til kickoff" %</label><input type="range" id="countdownLabelSize" min="1" max="10" step="0.5" style="width:100%; height:20px;"><div class="v" id="countdownLabelSizeVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+        <div><label style="font-family:var(--mono); font-size:9px; color:var(--text-faint); display:block; margin-bottom:3px;">Tall-størrelse %</label><input type="range" id="countdownSize" min="2" max="12" step="0.5" style="width:100%; height:20px;"><div class="v" id="countdownSizeVal" style="font-family:var(--mono); font-size:9px; color:var(--text-dim);"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="panelCustomEditor" style="display:none;">
+    <div class="field" style="display:flex; justify-content:center;">
+      <canvas id="previewCanvas" width="480" height="270" style="width:100%; max-width:360px; aspect-ratio:16/9; border:1px solid var(--border); border-radius:4px; background:#000;"></canvas>
+    </div>
+    <div class="field">
+      <label class="l">Bakgrunn</label>
+      <select id="customBase">
+        <option value="solid">Ensfarget</option>
+        <option value="smpte">SMPTE 75% bars</option>
+        <option value="full">Full Field 100% bars</option>
+        <option value="ramp">Gråtoner (11-trinn)</option>
+      </select>
+    </div>
+    <div class="field" id="customBgGroup">
+      <label class="l">Bakgrunnsfarge</label>
+      <input type="color" id="customBg">
+    </div>
+    <button id="btnNepTemplate" style="width:100%; padding:10px; margin-bottom:10px; font-family:var(--mono); font-size:11px; letter-spacing:.04em; background:var(--accent-dim); border:1px solid var(--accent); color:var(--accent); border-radius:4px;">⚡ Last inn NEP-mal (logo + tekst)</button>
+    <div id="customElementsList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button class="uploadbtn" id="btnAddText" style="flex:1; padding:10px;">+ Legg til tekst</button>
+      <button class="uploadbtn" id="btnAddLogo" style="flex:1; padding:10px;">+ Legg til logo</button>
+      <button class="uploadbtn" id="btnAddClock" style="flex:1; padding:10px;">+ Legg til klokke</button>
+      <button class="uploadbtn" id="btnAddCountdown" style="flex:1; padding:10px;">+ Legg til nedtelling</button>
+    </div>
+    <input type="file" id="customLogoFile" accept="image/*" style="display:none;">
+  </div>
+</div>
+
+<div class="section" id="panelBounce" style="display:none;">
+  <p class="section-title">Sprett-logo</p>
+  <div class="field">
+    <label class="l">Antall logoer</label>
+    <div class="radiorow" id="logoCountRow">
+      <label><input type="radio" name="logocount" value="1">1</label>
+      <label><input type="radio" name="logocount" value="2">2 (kolliderer)</label>
+    </div>
+  </div>
+  <div class="field">
+    <label class="l">Logo A</label>
+    <div class="logoslot">
+      <div class="preview" id="prevA">A</div>
+      <div class="fname" id="fnameA">Standard</div>
+      <button class="uploadbtn" id="btnUpA">Last opp</button>
+      <input type="file" id="fileA" accept="image/*">
+    </div>
+  </div>
+  <div class="field" id="logoBGroup">
+    <label class="l">Logo B</label>
+    <div class="logoslot">
+      <div class="preview" id="prevB">B</div>
+      <div class="fname" id="fnameB">Standard</div>
+      <button class="uploadbtn" id="btnUpB">Last opp</button>
+      <input type="file" id="fileB" accept="image/*">
+    </div>
+  </div>
+  <div class="field">
+    <label class="l">Bakgrunn</label>
+    <select id="bg">
+      <option value="pitch">Fotballbane</option>
+      <option value="solid">Ensfarget</option>
+      <option value="dark">Mørk studio</option>
+    </select>
+  </div>
+  <div class="field" id="solidColorGroup" style="display:none;">
+    <label class="l">Bakgrunnsfarge</label>
+    <input type="color" id="solidColor">
+  </div>
+  <div class="field">
+    <label class="l">Hastighet</label>
+    <div class="slidergroup"><input type="range" id="speed" min="1" max="40"><div class="sliderval" id="speedVal"></div></div>
+  </div>
+  <div class="field">
+    <label class="l">Logostørrelse</label>
+    <div class="slidergroup"><input type="range" id="logoSize" min="6" max="22"><div class="sliderval" id="logoSizeVal"></div></div>
+  </div>
+</div>
+
+<div class="section" id="panelScreensaver" style="display:none;">
+  <p class="section-title">Skjermsparer</p>
+  <div class="field">
+    <label class="l">Velg</label>
+    <select id="screensaver">
+      <option value="dvd">DVD</option>
+      <option value="matrix">Matrix</option>
+      <option value="pong">Pong</option>
+      <option value="pulse">Pulse</option>
+      <option value="starfield">Starfield</option>
+      <option value="time">Time</option>
+      <option value="toasters">Toasters</option>
+    </select>
+  </div>
+  <div class="hint" style="font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:8px;">
+    Fra nep-no-screensaver-samlingen, vises fullskjerm på visningen.
+  </div>
+  <div class="field" style="margin-top:14px;">
+    <label class="l">Logo i skjermsparere</label>
+    <input type="file" id="fileSsLogo" accept="image/*" style="display:none;">
+    <button class="uploadbtn" id="btnUpSsLogo" style="width:100%;padding:11px;">Last opp ny logo</button>
+    <div id="ssLogoList" style="margin-top:10px;"></div>
+    <div class="hint" style="font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:8px;">
+      Gjelder DVD, Pulse, Starfield og Toasters. Matrix tegner «NEP» som tekst, Pong og Time bruker ingen logo.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var state = {};
+  var applying = false;
+
+  function post(partial, onResult){
+    fetch('/api/state', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(partial)})
+      .then(function(r){ return r.json(); })
+      .then(function(res){ if(onResult) onResult(res); })
+      .catch(function(){});
+  }
+
+  function setMode(m){
+    document.querySelectorAll('.modebtn').forEach(function(b){ b.classList.toggle('active', b.dataset.mode===m); });
+    document.getElementById('panelBars').style.display = (m==='bars') ? 'block':'none';
+    document.getElementById('panelBounce').style.display = (m==='bounce') ? 'block':'none';
+    document.getElementById('panelScreensaver').style.display = (m==='screensaver') ? 'block':'none';
+  }
+
+  document.querySelectorAll('.modebtn').forEach(function(b){
+    b.addEventListener('click', function(){ setMode(b.dataset.mode); post({mode:b.dataset.mode}); });
+  });
+
+  document.getElementById('format').addEventListener('change', function(e){
+    statusText.textContent = 'Bytter skjermmodus...';
+    post({format:e.target.value}, function(res){
+      var x = res._xrandr;
+      if(x && x.ok){ statusText.textContent = 'Skjermmodus byttet: ' + x.msg; }
+      else if(x){ statusText.textContent = 'Klarte ikke bytte skjermmodus: ' + x.msg; statusEl.classList.add('bad'); }
+    });
+  });
+  document.getElementById('barsPattern').addEventListener('change', function(e){
+    var v = e.target.value;
+    document.getElementById('panelBarsStandard').style.display = (v==='custom') ? 'none':'block';
+    document.getElementById('panelCustomEditor').style.display = (v==='custom') ? 'block':'none';
+    if(v==='custom'){ renderPreview(); }
+    post({barsPattern:v});
+  });
+
+  // ---------- custom bars editor ----------
+  // ---------- live preview ----------
+  var pv = document.getElementById('previewCanvas');
+  var pctx = pv.getContext('2d');
+  var PV_BARCOLORS_75 = ['#bfbfbf','#bfbf00','#00bfbf','#00bf00','#bf00bf','#bf0000','#0000bf'];
+  var PV_BARCOLORS_100 = ['#ffffff','#ffff00','#00ffff','#00ff00','#ff00ff','#ff0000','#0000ff','#000000'];
+  var pvImageCache = {};
+
+  function pvDrawSmpte(w,h){
+    var mainH=Math.round(h*0.68), midH=Math.round(h*0.08), bottomH=h-mainH-midH;
+    var n=PV_BARCOLORS_75.length, bw=w/n;
+    for(var i=0;i<n;i++){ pctx.fillStyle=PV_BARCOLORS_75[i]; pctx.fillRect(Math.round(i*bw),0,Math.ceil(bw)+1,mainH); }
+    var rev=PV_BARCOLORS_75.slice().reverse();
+    for(i=0;i<n;i++){ pctx.fillStyle=rev[i]; pctx.fillRect(Math.round(i*bw),mainH,Math.ceil(bw)+1,midH); }
+    var by=mainH+midH;
+    var segs=[{c:'#1a2a5c',p:.14},{c:'#ffffff',p:.14},{c:'#3a1a5c',p:.14},{c:'#0a0a0a',p:.14},{c:'#050505',p:.145},{c:'#0a0a0a',p:.145},{c:'#1a1a1a',p:.145},{c:'#0a0a0a',p:.145}];
+    var x=0;
+    segs.forEach(function(s){ var sw=w*s.p; pctx.fillStyle=s.c; pctx.fillRect(Math.round(x),by,Math.ceil(sw)+1,bottomH); x+=sw; });
+  }
+  function pvDrawFull(w,h){
+    var n=PV_BARCOLORS_100.length, bw=w/n;
+    for(var i=0;i<n;i++){ pctx.fillStyle=PV_BARCOLORS_100[i]; pctx.fillRect(Math.round(i*bw),0,Math.ceil(bw)+1,h); }
+  }
+  function pvDrawRamp(w,h){
+    var steps=11, bw=w/steps;
+    for(var i=0;i<steps;i++){
+      var v=Math.round(255*(i/(steps-1))), hex=v.toString(16).padStart(2,'0');
+      pctx.fillStyle='#'+hex+hex+hex; pctx.fillRect(Math.round(i*bw),0,Math.ceil(bw)+1,h);
+    }
+  }
+  function renderPreview(){
+    var w=pv.width, h=pv.height;
+    var base = document.getElementById('customBase').value;
+    if(base==='smpte'){ pvDrawSmpte(w,h); }
+    else if(base==='full'){ pvDrawFull(w,h); }
+    else if(base==='ramp'){ pvDrawRamp(w,h); }
+    else { pctx.fillStyle=document.getElementById('customBg').value||'#14171c'; pctx.fillRect(0,0,w,h); }
+
+    customElements.forEach(function(el){
+      if(el.type==='text'){
+        pctx.save();
+        pctx.fillStyle = el.color || '#ffffff';
+        pctx.shadowColor = 'rgba(0,0,0,0.6)'; pctx.shadowBlur = h*0.012;
+        var size = h * ((el.size||4)/100);
+        pctx.font = '700 '+size+'px "IBM Plex Sans", Arial, sans-serif';
+        pctx.textAlign='center'; pctx.textBaseline='middle';
+        pctx.fillText(el.text||'', w*((el.x||50)/100), h*((el.y||50)/100));
+        pctx.restore();
+      } else if(el.type==='logo' && el.url){
+        var img = pvImageCache[el.url];
+        if(img === undefined){
+          pvImageCache[el.url] = null;
+          var im = new Image();
+          im.onload = function(){ pvImageCache[el.url] = im; renderPreview(); };
+          im.src = el.url;
+        } else if(img){
+          var dw = w*((el.size||15)/100), dh = dw*(img.naturalHeight/img.naturalWidth);
+          pctx.drawImage(img, w*((el.x||50)/100)-dw/2, h*((el.y||50)/100)-dh/2, dw, dh);
+        }
+      } else if(el.type==='clock'){
+        pctx.save();
+        pctx.fillStyle = el.color || '#ffffff';
+        pctx.shadowColor = 'rgba(0,0,0,0.6)'; pctx.shadowBlur = h*0.012;
+        var csize = h * ((el.size||4)/100);
+        pctx.font = '700 '+csize+'px "IBM Plex Mono", monospace';
+        pctx.textAlign='center'; pctx.textBaseline='middle';
+        pctx.fillText(formatClock(), w*((el.x||50)/100), h*((el.y||50)/100));
+        pctx.restore();
+      } else if(el.type==='countdown'){
+        pctx.save();
+        pctx.fillStyle = el.color || '#ff9c1a';
+        pctx.shadowColor = 'rgba(0,0,0,0.6)'; pctx.shadowBlur = h*0.012;
+        var labelSize = h*((el.size||4)/100)*0.6;
+        var valSize = h*((el.size||4)/100);
+        pctx.textAlign='center';
+        pctx.textBaseline='middle';
+        var cx = w*((el.x||50)/100), cy = h*((el.y||50)/100);
+        var gap = (labelSize+valSize)*0.65;
+        pctx.font = '"IBM Plex Mono", monospace '+labelSize+'px';
+        pctx.font = labelSize+'px "IBM Plex Mono", monospace';
+        pctx.fillText(el.label || 'Tid til kickoff', cx, cy);
+        pctx.font = '700 '+valSize+'px "IBM Plex Mono", monospace';
+        pctx.fillText(formatCountdown(el.target), cx, cy+gap);
+        pctx.restore();
+      }
+    });
+  }
+
+  function formatClock(){
+    var d = new Date();
+    function p2(n){ return (n<10?'0':'')+n; }
+    return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+  }
+  function formatCountdown(targetISO){
+    if(!targetISO) return '--:--:--';
+    var target = new Date(targetISO);
+    var diffMs = target.getTime() - Date.now();
+    if(isNaN(diffMs)) return '--:--:--';
+    if(diffMs <= 0) return 'KICKOFF';
+    var totalSec = Math.floor(diffMs/1000);
+    var hours = Math.floor(totalSec/3600);
+    var mins = Math.floor((totalSec%3600)/60);
+    var secs = totalSec%60;
+    function p2(n){ return (n<10?'0':'')+n; }
+    return p2(hours)+':'+p2(mins)+':'+p2(secs);
+  }
+  setInterval(function(){
+    if(customElements.some(function(e){ return e.type==='clock' || e.type==='countdown'; })){ renderPreview(); }
+  }, 1000);
+
+  var customElements = [];
+  var elIdCounter = 0;
+  var customElementsLoaded = false;
+
+  function postCustomElements(){
+    post({customElements: customElements});
+  }
+  var customDebounce = null;
+  function postCustomElementsDebounced(){
+    clearTimeout(customDebounce);
+    customDebounce = setTimeout(postCustomElements, 250);
+  }
+
+  function renderElementsList(){
+    var list = document.getElementById('customElementsList');
+    list.innerHTML = '';
+    customElements.forEach(function(el){
+      var row = document.createElement('div');
+      row.className = 'elrow';
+
+      var head = document.createElement('div');
+      head.className = 'elhead';
+
+      if(el.type === 'logo'){
+        var prev = document.createElement('div');
+        prev.className = 'elpreview';
+        if(el.url){ prev.innerHTML = '<img src="'+el.url+'">'; } else { prev.textContent = '?'; }
+        head.appendChild(prev);
+      }
+
+      var typeLabel = document.createElement('div');
+      typeLabel.className = 'eltype';
+      typeLabel.textContent = el.type === 'text' ? 'Tekst' : (el.type === 'clock' ? 'Klokke' : (el.type === 'countdown' ? 'Nedtelling' : 'Logo'));
+      head.appendChild(typeLabel);
+
+      var rmBtn = document.createElement('button');
+      rmBtn.className = 'elremove';
+      rmBtn.textContent = 'Fjern';
+      rmBtn.addEventListener('click', function(){
+        customElements = customElements.filter(function(x){ return x.id !== el.id; });
+        renderElementsList();
+        postCustomElements();
+      });
+      head.appendChild(rmBtn);
+      row.appendChild(head);
+
+      if(el.type === 'text'){
+        var txtInput = document.createElement('input');
+        txtInput.type = 'text';
+        txtInput.value = el.text || '';
+        txtInput.placeholder = 'Tekst...';
+        txtInput.addEventListener('input', function(ev){ el.text = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(txtInput);
+
+        var colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = el.color || '#ffffff';
+        colorInput.addEventListener('input', function(ev){ el.color = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(colorInput);
+      } else if(el.type === 'clock'){
+        var clkColor = document.createElement('input');
+        clkColor.type = 'color';
+        clkColor.value = el.color || '#ffffff';
+        clkColor.addEventListener('input', function(ev){ el.color = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(clkColor);
+      } else if(el.type === 'countdown'){
+        var cdLabelInput = document.createElement('input');
+        cdLabelInput.type = 'text';
+        cdLabelInput.placeholder = 'Tid til kickoff';
+        cdLabelInput.value = el.label || 'Tid til kickoff';
+        cdLabelInput.addEventListener('input', function(ev){ el.label = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(cdLabelInput);
+
+        var cdTargetInput = document.createElement('input');
+        cdTargetInput.type = 'datetime-local';
+        cdTargetInput.lang = 'nb-NO';
+        cdTargetInput.value = el.target || '';
+        cdTargetInput.addEventListener('input', function(ev){ el.target = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(cdTargetInput);
+
+        var cdColor = document.createElement('input');
+        cdColor.type = 'color';
+        cdColor.value = el.color || '#ff9c1a';
+        cdColor.addEventListener('input', function(ev){ el.color = ev.target.value; renderPreview(); postCustomElementsDebounced(); });
+        row.appendChild(cdColor);
+      } else {
+        var upBtn = document.createElement('button');
+        upBtn.className = 'uploadbtn';
+        upBtn.textContent = el.url ? 'Bytt bilde' : 'Last opp bilde';
+        upBtn.addEventListener('click', function(){
+          var fileInput = document.getElementById('customLogoFile');
+          fileInput.onchange = function(ev){
+            var f = ev.target.files[0];
+            if(!f) return;
+            var fd = new FormData();
+            fd.append('file', f);
+            fetch('/api/upload-custom/'+el.id, {method:'POST', body:fd}).then(function(r){return r.json();}).then(function(res){
+              el.url = res.url;
+              delete pvImageCache[res.url];
+              renderElementsList();
+              postCustomElements();
+            });
+          };
+          fileInput.click();
+        });
+        row.appendChild(upBtn);
+      }
+
+      var grid = document.createElement('div');
+      grid.className = 'elgrid';
+      [['x','X %',0,100],['y','Y %',0,100],['size', el.type!=='logo' ? 'Storrelse %':'Bredde %',2,el.type!=='logo'?15:50]].forEach(function(spec){
+        var key=spec[0], label=spec[1], min=spec[2], max=spec[3];
+        var cell = document.createElement('div');
+        var lab = document.createElement('label');
+        lab.textContent = label;
+        cell.appendChild(lab);
+        var rangeInput = document.createElement('input');
+        rangeInput.type = 'range';
+        rangeInput.min = min; rangeInput.max = max;
+        rangeInput.value = el[key] != null ? el[key] : (key==='size' ? (el.type!=='logo'?4:15) : 50);
+        el[key] = parseFloat(rangeInput.value);
+        var vEl = document.createElement('div');
+        vEl.className = 'v';
+        vEl.textContent = rangeInput.value;
+        rangeInput.addEventListener('input', function(ev){
+          el[key] = parseFloat(ev.target.value);
+          vEl.textContent = ev.target.value;
+          renderPreview();
+          postCustomElementsDebounced();
+        });
+        cell.appendChild(rangeInput);
+        cell.appendChild(vEl);
+        grid.appendChild(cell);
+      });
+      row.appendChild(grid);
+
+      list.appendChild(row);
+    });
+    renderPreview();
+  }
+
+  document.getElementById('btnAddText').addEventListener('click', function(){
+    customElements.push({id:'t'+(elIdCounter++)+Date.now(), type:'text', text:'Tekst', x:50, y:50, size:4, color:'#ffffff'});
+    renderElementsList();
+    postCustomElements();
+  });
+  document.getElementById('btnAddLogo').addEventListener('click', function(){
+    customElements.push({id:'l'+(elIdCounter++)+Date.now(), type:'logo', url:null, x:50, y:50, size:15});
+    renderElementsList();
+    postCustomElements();
+  });
+  document.getElementById('btnNepTemplate').addEventListener('click', function(){
+    var t = Date.now();
+    customElements = [
+      {id:'nep-logo-'+t, type:'logo', url:'/screensavers/NEP-Logo-FC-WHITE-RGB.png', x:50, y:24, size:26},
+      {id:'nep-title-'+t, type:'text', text: document.getElementById('arena').value || 'NEP Kommentatorkit', x:50, y:52, size:6, color:'#ffffff'},
+      {id:'nep-sub-'+t, type:'text', text: document.getElementById('ekstra').value || 'Testbilde', x:50, y:60, size:3, color:'#c9d4dd'},
+      {id:'nep-clock-'+t, type:'clock', x:50, y:80, size:4.5, color:'#ff9c1a'}
+    ];
+    customElementsLoaded = true;
+    renderElementsList();
+    postCustomElements();
+  });
+  document.getElementById('btnAddClock').addEventListener('click', function(){
+    customElements.push({id:'c'+(elIdCounter++)+Date.now(), type:'clock', x:50, y:50, size:4, color:'#ffffff'});
+    renderElementsList();
+    postCustomElements();
+  });
+  document.getElementById('btnAddCountdown').addEventListener('click', function(){
+    customElements.push({id:'cd'+(elIdCounter++)+Date.now(), type:'countdown', label:'Tid til kickoff', target:'', x:50, y:50, size:4, color:'#ff9c1a'});
+    renderElementsList();
+    postCustomElements();
+  });
+  document.getElementById('customBg').addEventListener('input', function(e){ renderPreview(); post({customBg:e.target.value}); });
+  document.getElementById('customBase').addEventListener('change', function(e){
+    document.getElementById('customBgGroup').style.display = (e.target.value==='solid') ? 'block':'none';
+    renderPreview();
+    post({customBase:e.target.value});
+  });
+
+  var swText = document.getElementById('swText');
+  swText.addEventListener('click', function(){
+    var on = !swText.classList.contains('on');
+    swText.classList.toggle('on', on);
+    post({textOn:on});
+  });
+
+  var swClock = document.getElementById('swClock');
+  swClock.addEventListener('click', function(){
+    var on = !swClock.classList.contains('on');
+    swClock.classList.toggle('on', on);
+    document.getElementById('clockFields').style.display = on ? 'flex':'none';
+    post({clockOn:on});
+  });
+  var swCountdown = document.getElementById('swCountdown');
+  swCountdown.addEventListener('click', function(){
+    var on = !swCountdown.classList.contains('on');
+    swCountdown.classList.toggle('on', on);
+    document.getElementById('countdownFields').style.display = on ? 'flex':'none';
+    post({countdownOn:on});
+  });
+
+  ['clockX','clockY','clockSize'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(e){
+      document.getElementById(id+'Val').textContent = e.target.value;
+      var o = {}; o[id] = parseFloat(e.target.value);
+      debouncedPost(id, o[id]);
+    });
+  });
+  document.getElementById('clockColor').addEventListener('input', function(e){ post({clockColor:e.target.value}); });
+
+  ['countdownX','countdownY','countdownSize','countdownLabelSize'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(e){
+      document.getElementById(id+'Val').textContent = e.target.value;
+      var o = {}; o[id] = parseFloat(e.target.value);
+      debouncedPost(id, o[id]);
+    });
+  });
+  document.getElementById('countdownColor').addEventListener('input', function(e){ post({countdownColor:e.target.value}); });
+  document.getElementById('countdownLabel').addEventListener('input', function(e){ debouncedPost('countdownLabel', e.target.value); });
+  document.getElementById('countdownTarget').addEventListener('input', function(e){ post({countdownTarget:e.target.value}); });
+
+  var debounceTimers = {};
+  function debouncedPost(key, val){
+    clearTimeout(debounceTimers[key]);
+    debounceTimers[key] = setTimeout(function(){ var o={}; o[key]=val; post(o); }, 250);
+  }
+  ['arena','ekstra','dato'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(e){ debouncedPost(id, e.target.value); });
+  });
+
+  document.querySelectorAll('#logoCountRow input').forEach(function(r){
+    r.addEventListener('change', function(){
+      document.querySelectorAll('#logoCountRow label').forEach(function(l){ l.classList.remove('checked'); });
+      r.parentElement.classList.add('checked');
+      var n = parseInt(r.value,10);
+      document.getElementById('logoBGroup').style.display = (n===2) ? 'block':'none';
+      post({logoCount:n});
+    });
+  });
+
+  document.getElementById('bg').addEventListener('change', function(e){
+    document.getElementById('solidColorGroup').style.display = (e.target.value==='solid') ? 'block':'none';
+    post({bg:e.target.value});
+  });
+  document.getElementById('solidColor').addEventListener('input', function(e){ post({solidColor:e.target.value}); });
+  document.getElementById('screensaver').addEventListener('change', function(e){ post({screensaver:e.target.value}); });
+
+  document.getElementById('speed').addEventListener('input', function(e){
+    document.getElementById('speedVal').textContent = e.target.value;
+    debouncedPost('speed', parseInt(e.target.value,10));
+  });
+  document.getElementById('logoSize').addEventListener('input', function(e){
+    document.getElementById('logoSizeVal').textContent = e.target.value+'%';
+    debouncedPost('logoSizePct', parseInt(e.target.value,10));
+  });
+
+  function wireUpload(btnId, fileId, previewId, fnameId, which){
+    var btn = document.getElementById(btnId), file = document.getElementById(fileId);
+    btn.addEventListener('click', function(){ file.click(); });
+    file.addEventListener('change', function(e){
+      var f = e.target.files[0];
+      if(!f) return;
+      var fd = new FormData();
+      fd.append('file', f);
+      fetch('/api/upload/'+which, {method:'POST', body:fd}).then(function(r){return r.json();}).then(function(res){
+        document.getElementById(fnameId).textContent = f.name;
+        document.getElementById(previewId).innerHTML = '<img src="'+res.url+'?t='+Date.now()+'">';
+      });
+    });
+  }
+  wireUpload('btnUpA','fileA','prevA','fnameA','A');
+  wireUpload('btnUpB','fileB','prevB','fnameB','B');
+
+  var ssLogoActive = null;
+
+  function renderSsLogoList(files, active){
+    ssLogoActive = active || null;
+    var list = document.getElementById('ssLogoList');
+    list.innerHTML = '';
+
+    var defRow = document.createElement('div');
+    defRow.className = 'presetrow';
+    var defLabel = document.createElement('div');
+    defLabel.className = 'pname';
+    defLabel.textContent = 'Standard (NEP)';
+    defRow.appendChild(defLabel);
+    var defBtn = document.createElement('button');
+    defBtn.className = 'pload';
+    var defActive = !ssLogoActive;
+    defBtn.textContent = defActive ? 'I bruk' : 'Bruk';
+    defBtn.disabled = defActive;
+    defBtn.addEventListener('click', function(){ activateSsLogo(null); });
+    defRow.appendChild(defBtn);
+    list.appendChild(defRow);
+
+    (files || []).forEach(function(fname){
+      var url = '/uploads/' + fname;
+      var isActive = (ssLogoActive === url);
+      var row = document.createElement('div');
+      row.className = 'presetrow';
+      var thumb = document.createElement('div');
+      thumb.className = 'presetthumb';
+      thumb.innerHTML = '<img src="' + url + '">';
+      row.appendChild(thumb);
+      var label = document.createElement('div');
+      label.className = 'pname';
+      label.textContent = fname.replace(/^sslogo_/, '').replace(/\.[a-zA-Z0-9]+$/, '');
+      row.appendChild(label);
+      var useBtn = document.createElement('button');
+      useBtn.className = 'pload';
+      useBtn.textContent = isActive ? 'I bruk' : 'Bruk';
+      useBtn.disabled = isActive;
+      useBtn.addEventListener('click', function(){ activateSsLogo(fname); });
+      row.appendChild(useBtn);
+      var delBtn = document.createElement('button');
+      delBtn.className = 'pdelete';
+      delBtn.textContent = 'Slett';
+      delBtn.addEventListener('click', function(){
+        if(!confirm('Slette denne logoen?')) return;
+        fetch('/api/screensaver-logos/' + encodeURIComponent(fname), {method:'DELETE'})
+          .then(function(r){return r.json();})
+          .then(function(res){ renderSsLogoList(res.files, res.active); })
+          .catch(function(){});
+      });
+      row.appendChild(delBtn);
+      list.appendChild(row);
+    });
+  }
+
+  function activateSsLogo(fname){
+    if(fname === null){
+      post({screensaverLogo: null}, function(){ refreshSsLogoList(); });
+      return;
+    }
+    fetch('/api/screensaver-logos/' + encodeURIComponent(fname) + '/activate', {method:'POST'})
+      .then(function(r){return r.json();})
+      .then(function(res){ renderSsLogoList(res.files, res.active); })
+      .catch(function(){});
+  }
+
+  function refreshSsLogoList(){
+    fetch('/api/screensaver-logos').then(function(r){return r.json();})
+      .then(function(res){ renderSsLogoList(res.files, res.active); })
+      .catch(function(){});
+  }
+
+  document.getElementById('btnUpSsLogo').addEventListener('click', function(){ document.getElementById('fileSsLogo').click(); });
+  document.getElementById('fileSsLogo').addEventListener('change', function(e){
+    var f = e.target.files[0];
+    if(!f) return;
+    var fd = new FormData();
+    fd.append('file', f);
+    fetch('/api/screensaver-logos', {method:'POST', body:fd}).then(function(r){return r.json();}).then(function(res){
+      renderSsLogoList(res.files, res.active);
+    }).catch(function(){});
+    e.target.value = '';
+  });
+
+  refreshSsLogoList();
+
+  function applyToForm(s){
+    applying = true;
+    state = s;
+    setMode(s.mode);
+    document.getElementById('format').value = s.format;
+    document.getElementById('barsPattern').value = s.barsPattern;
+    document.getElementById('panelBarsStandard').style.display = (s.barsPattern==='custom') ? 'none':'block';
+    document.getElementById('panelCustomEditor').style.display = (s.barsPattern==='custom') ? 'block':'none';
+    document.getElementById('customBg').value = s.customBg || '#14171c';
+    document.getElementById('customBase').value = s.customBase || 'solid';
+    document.getElementById('customBgGroup').style.display = ((s.customBase||'solid')==='solid') ? 'block':'none';
+    if(!customElementsLoaded){
+      customElements = (s.customElements || []).slice();
+      renderElementsList();
+      customElementsLoaded = true;
+    }
+    swText.classList.toggle('on', !!s.textOn);
+
+    swClock.classList.toggle('on', !!s.clockOn);
+    document.getElementById('clockFields').style.display = s.clockOn ? 'flex':'none';
+    document.getElementById('clockColor').value = s.clockColor || '#ffffff';
+    document.getElementById('clockX').value = s.clockX != null ? s.clockX : 50;
+    document.getElementById('clockXVal').textContent = document.getElementById('clockX').value;
+    document.getElementById('clockY').value = s.clockY != null ? s.clockY : 88;
+    document.getElementById('clockYVal').textContent = document.getElementById('clockY').value;
+    document.getElementById('clockSize').value = s.clockSize != null ? s.clockSize : 4;
+    document.getElementById('clockSizeVal').textContent = document.getElementById('clockSize').value;
+
+    swCountdown.classList.toggle('on', !!s.countdownOn);
+    document.getElementById('countdownFields').style.display = s.countdownOn ? 'flex':'none';
+    document.getElementById('countdownTarget').value = s.countdownTarget || '';
+    document.getElementById('countdownLabel').value = s.countdownLabel || 'Tid til kickoff';
+    document.getElementById('countdownColor').value = s.countdownColor || '#ff9c1a';
+    document.getElementById('countdownX').value = s.countdownX != null ? s.countdownX : 50;
+    document.getElementById('countdownXVal').textContent = document.getElementById('countdownX').value;
+    document.getElementById('countdownY').value = s.countdownY != null ? s.countdownY : 94;
+    document.getElementById('countdownYVal').textContent = document.getElementById('countdownY').value;
+    document.getElementById('countdownSize').value = s.countdownSize != null ? s.countdownSize : 3;
+    document.getElementById('countdownSizeVal').textContent = document.getElementById('countdownSize').value;
+    document.getElementById('countdownLabelSize').value = s.countdownLabelSize != null ? s.countdownLabelSize : 2.5;
+    document.getElementById('countdownLabelSizeVal').textContent = document.getElementById('countdownLabelSize').value;
+    document.getElementById('arena').value = s.arena || '';
+    document.getElementById('ekstra').value = s.ekstra || '';
+    document.getElementById('dato').value = s.dato || '';
+    document.querySelectorAll('#logoCountRow input').forEach(function(r){
+      var checked = (String(s.logoCount) === r.value);
+      r.checked = checked;
+      r.parentElement.classList.toggle('checked', checked);
+    });
+    document.getElementById('logoBGroup').style.display = (s.logoCount===2) ? 'block':'none';
+    document.getElementById('bg').value = s.bg;
+    document.getElementById('solidColorGroup').style.display = (s.bg==='solid') ? 'block':'none';
+    document.getElementById('solidColor').value = s.solidColor || '#0d3b1e';
+    document.getElementById('speed').value = s.speed;
+    document.getElementById('speedVal').textContent = s.speed;
+    document.getElementById('logoSize').value = s.logoSizePct;
+    document.getElementById('logoSizeVal').textContent = s.logoSizePct+'%';
+    document.getElementById('screensaver').value = s.screensaver || 'dvd';
+    if(s.screensaverLogo !== ssLogoActive){
+      var list = document.getElementById('ssLogoList');
+      var cachedFiles = Array.prototype.slice.call(list.querySelectorAll('.presetthumb img')).map(function(img){
+        return img.getAttribute('src').replace('/uploads/', '');
+      });
+      renderSsLogoList(cachedFiles, s.screensaverLogo || null);
+    }
+    if(s.logoA){ document.getElementById('prevA').innerHTML = '<img src="'+s.logoA+'">'; document.getElementById('fnameA').textContent='Lastet opp'; }
+    if(s.logoB){ document.getElementById('prevB').innerHTML = '<img src="'+s.logoB+'">'; document.getElementById('fnameB').textContent='Lastet opp'; }
+    applying = false;
+  }
+
+  function renderPresetList(names){
+    var list = document.getElementById('presetList');
+    list.innerHTML = '';
+    if(!names || !names.length){
+      list.innerHTML = '<p class="presetempty">Ingen lagrede design ennå.</p>';
+      return;
+    }
+    names.forEach(function(name){
+      var row = document.createElement('div');
+      row.className = 'presetrow';
+      var label = document.createElement('div');
+      label.className = 'pname';
+      label.textContent = name;
+      row.appendChild(label);
+      var loadBtn = document.createElement('button');
+      loadBtn.className = 'pload';
+      loadBtn.textContent = 'Last inn';
+      loadBtn.addEventListener('click', function(){ loadPreset(name); });
+      row.appendChild(loadBtn);
+      var delBtn = document.createElement('button');
+      delBtn.className = 'pdelete';
+      delBtn.textContent = 'Slett';
+      delBtn.addEventListener('click', function(){
+        if(!confirm('Slette «'+name+'»?')) return;
+        fetch('/api/presets/'+encodeURIComponent(name), {method:'DELETE'})
+          .then(function(r){return r.json();})
+          .then(function(res){ renderPresetList(res.names); })
+          .catch(function(){});
+      });
+      row.appendChild(delBtn);
+      list.appendChild(row);
+    });
+  }
+
+  function refreshPresetList(){
+    fetch('/api/presets').then(function(r){return r.json();}).then(renderPresetList).catch(function(){});
+  }
+
+  function loadPreset(name){
+    fetch('/api/presets/'+encodeURIComponent(name)+'/load', {method:'POST'})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        customElements = (res.customElements || []).slice();
+        customElementsLoaded = true;
+        renderElementsList();
+        applyToForm(res);
+      })
+      .catch(function(){});
+  }
+
+  function savePreset(){
+    var input = document.getElementById('presetName');
+    var name = input.value.trim();
+    if(!name) return;
+    fetch('/api/presets/'+encodeURIComponent(name), {method:'PUT'})
+      .then(function(r){return r.json();})
+      .then(function(res){ input.value=''; renderPresetList(res.names); })
+      .catch(function(){});
+  }
+  document.getElementById('btnSavePreset').addEventListener('click', savePreset);
+  document.getElementById('presetName').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') savePreset();
+  });
+
+  refreshPresetList();
+
+  var statusEl = document.getElementById('status');
+  var statusText = document.getElementById('statusText');
+
+  fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+    applyToForm(s);
+    statusEl.classList.add('ok');
+    statusText.textContent = 'Tilkoblet — endringer vises live på skjermen';
+    var es = new EventSource('/api/stream');
+    es.onmessage = function(ev){
+      try{ var data = JSON.parse(ev.data); applyToForm(Object.assign({}, state, data)); }catch(e){}
+    };
+    es.onerror = function(){
+      statusEl.classList.remove('ok'); statusEl.classList.add('bad');
+      statusText.textContent = 'Mistet tilkobling, prøver igjen...';
+    };
+    es.onopen = function(){
+      statusEl.classList.remove('bad'); statusEl.classList.add('ok');
+      statusText.textContent = 'Tilkoblet — endringer vises live på skjermen';
+    };
+  }).catch(function(){
+    statusEl.classList.add('bad'); statusText.textContent = 'Kan ikke nå serveren';
+  });
+})();
+</script>
+</body>
+</html>

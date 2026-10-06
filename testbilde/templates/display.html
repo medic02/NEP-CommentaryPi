@@ -1,0 +1,619 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NEP Testbilde</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#000;height:100%;width:100%;}
+  #stage{display:block;position:fixed;top:0;left:0;}
+  #screensaverFrame{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;border:0;background:#000;}
+</style>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<iframe id="screensaverFrame"></iframe>
+<script>
+(function(){
+  "use strict";
+
+  var SCREENSAVER_BASE = '/screensavers/';
+  var screensaverFrame = document.getElementById('screensaverFrame');
+  var loadedScreensaver = null;
+  var loadedScreensaverLogo = undefined;
+
+  var FORMATS = {
+    "1080i60": {w:1920, h:1080, interlace:true},
+    "1080i50": {w:1920, h:1080, interlace:true},
+    "1080p60": {w:1920, h:1080, interlace:false},
+    "1080p50": {w:1920, h:1080, interlace:false},
+    "720p60":  {w:1280, h:720,  interlace:false},
+    "720p50":  {w:1280, h:720,  interlace:false},
+    "576i50":  {w:720,  h:576,  interlace:true},
+    "576p50":  {w:720,  h:576,  interlace:false}
+  };
+
+  var canvas = document.getElementById('stage');
+  var ctx = canvas.getContext('2d');
+
+  var state = {
+    mode: 'bars', format: '1080p', barsPattern: 'smpte', textOn: true,
+    dato: '', arena: '', ekstra: '', logoCount: 1, bg: 'pitch',
+    solidColor: '#0d3b1e', speed: 4, logoSizePct: 12, logoA: null, logoB: null,
+    screensaver: 'dvd'
+  };
+
+  function applyFormat(){
+    var f = FORMATS[state.format] || FORMATS['1080i60'];
+    canvas.width = f.w;
+    canvas.height = f.h;
+    // position canvas to fill the screen, letterboxed, centered
+    var sw = window.innerWidth, sh = window.innerHeight;
+    var scale = Math.min(sw / f.w, sh / f.h);
+    var dw = f.w * scale, dh = f.h * scale;
+    canvas.style.width = dw + 'px';
+    canvas.style.height = dh + 'px';
+    canvas.style.left = ((sw - dw) / 2) + 'px';
+    canvas.style.top = ((sh - dh) / 2) + 'px';
+  }
+  window.addEventListener('resize', applyFormat);
+
+  // =========================================================
+  // BARS MODE
+  // =========================================================
+  var BARCOLORS_75 = ['#bfbfbf','#bfbf00','#00bfbf','#00bf00','#bf00bf','#bf0000','#0000bf'];
+  var BARCOLORS_100 = ['#ffffff','#ffff00','#00ffff','#00ff00','#ff00ff','#ff0000','#0000ff','#000000'];
+
+  function renderBars(){
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    if(state.barsPattern === 'custom'){
+      ensureCustomImages(state.customElements || [], function(){ drawCustom(w,h); });
+      return;
+    }
+    if(state.barsPattern === 'smpte'){ drawSmpte(w,h); }
+    else if(state.barsPattern === 'full'){ drawFullBars(w,h); }
+    else { drawGrayRamp(w,h); }
+    if(state.textOn){ drawTextOverlay(w,h); }
+    if(state.clockOn){ drawSimpleText(w,h, formatClock(), state.clockX, state.clockY, state.clockSize, state.clockColor, '"IBM Plex Mono", monospace'); }
+    if(state.countdownOn){ drawCountdown(w,h); }
+  }
+
+  function drawSimpleText(w,h,text,xPct,yPct,sizePct,color,fontFamily){
+    ctx.save();
+    ctx.fillStyle = color || '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = h*0.012;
+    var size = h * ((sizePct||4)/100);
+    ctx.font = '700 '+size+'px '+(fontFamily||'"IBM Plex Sans", Arial, sans-serif');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text||'', w*((xPct==null?50:xPct)/100), h*((yPct==null?50:yPct)/100));
+    ctx.restore();
+  }
+
+  function formatCountdown(targetISO){
+    if(!targetISO) return '--:--:--';
+    var target = new Date(targetISO);
+    var diffMs = target.getTime() - Date.now();
+    if(isNaN(diffMs)) return '--:--:--';
+    if(diffMs <= 0) return 'KICKOFF';
+    var totalSec = Math.floor(diffMs/1000);
+    var hours = Math.floor(totalSec/3600);
+    var mins = Math.floor((totalSec%3600)/60);
+    var secs = totalSec%60;
+    function p2(n){ return (n<10?'0':'')+n; }
+    return p2(hours)+':'+p2(mins)+':'+p2(secs);
+  }
+
+  function drawCountdown(w,h){
+    var label = state.countdownLabel || 'Tid til kickoff';
+    var value = formatCountdown(state.countdownTarget);
+    var labelSize = state.countdownLabelSize != null ? state.countdownLabelSize : 2.5;
+    var valueSize = state.countdownSize != null ? state.countdownSize : 3;
+    var gap = h * ((labelSize + valueSize)/100) * 0.65;
+    drawSimpleText(w,h, label, state.countdownX, state.countdownY, labelSize, state.countdownColor, '"IBM Plex Mono", monospace');
+    drawSimpleText(w,h, value, state.countdownX, state.countdownY + gap, valueSize, state.countdownColor, '700 "IBM Plex Mono", monospace');
+  }
+
+  var customImageCache = {};
+  function ensureCustomImages(elements, cb){
+    var urls = elements.filter(function(e){ return e.type==='logo' && e.url; }).map(function(e){ return e.url; });
+    var pending = urls.filter(function(u){ return !(u in customImageCache); });
+    if(pending.length === 0){ cb(); return; }
+    var remaining = pending.length;
+    pending.forEach(function(u){
+      var img = new Image();
+      img.onload = function(){ customImageCache[u] = img; if(--remaining === 0) cb(); };
+      img.onerror = function(){ customImageCache[u] = null; if(--remaining === 0) cb(); };
+      img.src = u;
+    });
+  }
+
+  function drawCustom(w,h){
+    var base = state.customBase || 'solid';
+    if(base === 'smpte'){ drawSmpte(w,h); }
+    else if(base === 'full'){ drawFullBars(w,h); }
+    else if(base === 'ramp'){ drawGrayRamp(w,h); }
+    else { ctx.fillStyle = state.customBg || '#14171c'; ctx.fillRect(0,0,w,h); }
+    (state.customElements || []).forEach(function(el){
+      if(el.type === 'text'){
+        ctx.save();
+        ctx.fillStyle = el.color || '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = h*0.012;
+        var size = h * ((el.size || 4)/100);
+        ctx.font = '700 '+size+'px "IBM Plex Sans", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(el.text || '', w*((el.x||50)/100), h*((el.y||50)/100));
+        ctx.restore();
+      } else if(el.type === 'logo' && el.url){
+        var img = customImageCache[el.url];
+        if(img){
+          var dw = w * ((el.size || 15)/100);
+          var dh = dw * (img.naturalHeight/img.naturalWidth);
+          ctx.drawImage(img, w*((el.x||50)/100) - dw/2, h*((el.y||50)/100) - dh/2, dw, dh);
+        }
+      } else if(el.type === 'clock'){
+        ctx.save();
+        ctx.fillStyle = el.color || '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = h*0.012;
+        var csize = h * ((el.size || 4)/100);
+        ctx.font = '700 '+csize+'px "IBM Plex Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(formatClock(), w*((el.x||50)/100), h*((el.y||50)/100));
+        ctx.restore();
+      } else if(el.type === 'countdown'){
+        var cx = w*((el.x||50)/100), cy = h*((el.y||50)/100);
+        var labelSize = h*((el.size||4)/100)*0.6;
+        var valSize = h*((el.size||4)/100);
+        var gap = (labelSize+valSize)*0.65;
+        ctx.save();
+        ctx.fillStyle = el.color || '#ff9c1a';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = h*0.012;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = labelSize+'px "IBM Plex Mono", monospace';
+        ctx.fillText(el.label || 'Tid til kickoff', cx, cy);
+        ctx.font = '700 '+valSize+'px "IBM Plex Mono", monospace';
+        ctx.fillText(formatCountdown(el.target), cx, cy+gap);
+        ctx.restore();
+      }
+    });
+  }
+
+  function formatClock(){
+    var d = new Date();
+    function p2(n){ return (n<10?'0':'')+n; }
+    return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+  }
+
+  function drawSmpte(w,h){
+    var mainH = Math.round(h * 0.68);
+    var midH = Math.round(h * 0.08);
+    var bottomH = h - mainH - midH;
+    var n = BARCOLORS_75.length;
+    var bw = w / n;
+    for(var i=0;i<n;i++){
+      ctx.fillStyle = BARCOLORS_75[i];
+      ctx.fillRect(Math.round(i*bw), 0, Math.ceil(bw)+1, mainH);
+    }
+    var rev = BARCOLORS_75.slice().reverse();
+    for(i=0;i<n;i++){
+      ctx.fillStyle = rev[i];
+      ctx.fillRect(Math.round(i*bw), mainH, Math.ceil(bw)+1, midH);
+    }
+    var by = mainH + midH;
+    var segs = [
+      {c:'#1a2a5c', wpct:0.14},{c:'#ffffff', wpct:0.14},{c:'#3a1a5c', wpct:0.14},
+      {c:'#0a0a0a', wpct:0.14},{c:'#050505', wpct:0.145},{c:'#0a0a0a', wpct:0.145},
+      {c:'#1a1a1a', wpct:0.145},{c:'#0a0a0a', wpct:0.145}
+    ];
+    var x = 0;
+    segs.forEach(function(s){
+      var sw = w * s.wpct;
+      ctx.fillStyle = s.c;
+      ctx.fillRect(Math.round(x), by, Math.ceil(sw)+1, bottomH);
+      x += sw;
+    });
+  }
+
+  function drawFullBars(w,h){
+    var n = BARCOLORS_100.length;
+    var bw = w / n;
+    for(var i=0;i<n;i++){
+      ctx.fillStyle = BARCOLORS_100[i];
+      ctx.fillRect(Math.round(i*bw), 0, Math.ceil(bw)+1, h);
+    }
+  }
+
+  function drawGrayRamp(w,h){
+    var steps = 11;
+    var bw = w / steps;
+    for(var i=0;i<steps;i++){
+      var v = Math.round(255 * (i/(steps-1)));
+      var hex = v.toString(16).padStart(2,'0');
+      ctx.fillStyle = '#'+hex+hex+hex;
+      ctx.fillRect(Math.round(i*bw), 0, Math.ceil(bw)+1, h);
+      ctx.fillStyle = (v > 128) ? '#000' : '#fff';
+      ctx.font = (h*0.03)+'px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.round(i/(steps-1)*100)+'%', i*bw + bw/2, h*0.06);
+    }
+  }
+
+  function drawTextOverlay(w,h){
+    ctx.save();
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = h * 0.018;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = h * 0.004;
+
+    var titleSize = h * 0.115;
+    ctx.font = '800 '+titleSize+'px "IBM Plex Sans", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.arena || '', w/2, h * 0.24);
+
+    var subSize = h * 0.052;
+    ctx.font = '500 '+subSize+'px "IBM Plex Sans", Arial, sans-serif';
+    ctx.fillText(state.ekstra || '', w/2, h * 0.315);
+
+    var datoSize = h * 0.065;
+    ctx.font = '600 '+datoSize+'px "IBM Plex Sans", Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(state.dato || '', w * 0.06, h * 0.52);
+
+    ctx.restore();
+  }
+
+  // =========================================================
+  // BOUNCE MODE
+  // =========================================================
+  var rafId = null;
+  var sprites = [];
+  var logos = { A: null, B: null };
+  var loadedUrls = { A: null, B: null };
+
+  function defaultLogoCanvas(color, letter){
+    var c = document.createElement('canvas');
+    c.width = 200; c.height = 200;
+    var cx = c.getContext('2d');
+    cx.fillStyle = color;
+    cx.beginPath(); cx.arc(100,100,96,0,Math.PI*2); cx.fill();
+    cx.strokeStyle = 'rgba(255,255,255,0.35)'; cx.lineWidth = 6; cx.stroke();
+    cx.fillStyle = '#0d1013';
+    cx.font = '700 96px Arial, sans-serif';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(letter, 100, 108);
+    return c;
+  }
+  var DEFAULT_A = defaultLogoCanvas('#ff9c1a','A');
+  var DEFAULT_B = defaultLogoCanvas('#33c9e0','B');
+
+  function ensureLogoImage(key, url, cb){
+    if(!url){ logos[key] = null; loadedUrls[key] = null; cb(); return; }
+    if(loadedUrls[key] === url && logos[key]){ cb(); return; }
+    var img = new Image();
+    img.onload = function(){ logos[key] = img; loadedUrls[key] = url; cb(); };
+    img.onerror = function(){ logos[key] = null; loadedUrls[key] = null; cb(); };
+    img.src = url;
+  }
+
+  function makeSprite(img, id){
+    return { img:img, id:id, x:0, y:0, vx:0, vy:0, r:40 };
+  }
+
+  function speedMagnitude(){ return 2 + state.speed*1.1; }
+
+  function layoutBounceSprites(preserveVelocity){
+    var w = canvas.width, h = canvas.height;
+    var wanted = ['A'];
+    if(state.logoCount === 2) wanted.push('B');
+    var newSprites = [];
+    wanted.forEach(function(key, idx){
+      var existing = sprites.find(function(s){ return s.id === key; });
+      var img = logos[key] || (key === 'A' ? DEFAULT_A : DEFAULT_B);
+      var r = Math.min(w,h) * (state.logoSizePct/100) / 2;
+      var sp = existing || makeSprite(img, key);
+      sp.img = img;
+      sp.r = r;
+      if(!existing || !preserveVelocity){
+        sp.x = w * (0.3 + idx*0.4);
+        sp.y = h * (0.35 + idx*0.2);
+      }
+      if(!existing){
+        var baseSpeed = speedMagnitude();
+        var ang = Math.random()*Math.PI*2;
+        sp.vx = Math.cos(ang)*baseSpeed;
+        sp.vy = Math.sin(ang)*baseSpeed;
+      }
+      sp.x = Math.min(Math.max(sp.x, sp.r), w - sp.r);
+      sp.y = Math.min(Math.max(sp.y, sp.r), h - sp.r);
+      newSprites.push(sp);
+    });
+    sprites = newSprites;
+  }
+
+  function applySpeedToSprites(){
+    var target = speedMagnitude();
+    sprites.forEach(function(s){
+      var mag = Math.sqrt(s.vx*s.vx + s.vy*s.vy) || 0.001;
+      var scale = target / mag;
+      s.vx *= scale; s.vy *= scale;
+    });
+  }
+
+  function drawPitch(c, w,h){
+    var g = c.createLinearGradient(0,0,0,h);
+    g.addColorStop(0, '#0f4d24'); g.addColorStop(1, '#0a3a1b');
+    c.fillStyle = g; c.fillRect(0,0,w,h);
+    var stripes = 12, sw = w/stripes;
+    c.fillStyle = 'rgba(255,255,255,0.035)';
+    for(var i=0;i<stripes;i+=2){ c.fillRect(i*sw,0,sw,h); }
+    c.strokeStyle = 'rgba(255,255,255,0.85)';
+    c.lineWidth = Math.max(2, h*0.004);
+    var m = Math.min(w,h)*0.05;
+    c.strokeRect(m, m, w-2*m, h-2*m);
+    c.beginPath(); c.moveTo(w/2, m); c.lineTo(w/2, h-m); c.stroke();
+    var pitchH = h - 2*m;
+    var scale = pitchH / 68;
+    var cr = 9.15*scale;
+    c.beginPath(); c.arc(w/2, h/2, cr, 0, Math.PI*2); c.stroke();
+    c.beginPath(); c.arc(w/2, h/2, Math.max(2,h*0.004), 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.85)'; c.fill();
+    function penaltyBox(sideLeft){
+      var boxW = 16.5*scale, boxH = 40.3*scale;
+      var gBoxW = 5.5*scale, gBoxH = 18.32*scale;
+      var x = sideLeft ? m : w-m-boxW;
+      var y = h/2 - boxH/2;
+      c.strokeRect(x, y, boxW, boxH);
+      var gx = sideLeft ? m : w-m-gBoxW;
+      var gy = h/2 - gBoxH/2;
+      c.strokeRect(gx, gy, gBoxW, gBoxH);
+      var spotX = sideLeft ? m + 11*scale : w - m - 11*scale;
+      c.beginPath(); c.arc(spotX, h/2, Math.max(2,h*0.004),0,Math.PI*2); c.fill();
+      c.beginPath();
+      c.arc(spotX, h/2, 9.15*scale, sideLeft ? -0.3*Math.PI : 0.7*Math.PI, sideLeft ? 0.3*Math.PI : 1.3*Math.PI);
+      c.stroke();
+    }
+    penaltyBox(true); penaltyBox(false);
+  }
+
+  function drawBounceBackground(c, w,h){
+    if(state.bg === 'pitch'){ drawPitch(c, w,h); }
+    else if(state.bg === 'solid'){ c.fillStyle = state.solidColor; c.fillRect(0,0,w,h); }
+    else {
+      var g = c.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*0.7);
+      g.addColorStop(0,'#1c2129'); g.addColorStop(1,'#0a0c0f');
+      c.fillStyle = g; c.fillRect(0,0,w,h);
+    }
+  }
+
+  // Background is expensive to redraw (gradient + stripes + strokes) and
+  // never changes between frames, so render it once to an offscreen
+  // canvas and just blit it every frame instead.
+  var bgCache = null, bgCacheKey = '';
+  function getBackgroundCache(w,h){
+    var key = state.bg + '|' + state.solidColor + '|' + w + 'x' + h;
+    if(bgCache && bgCacheKey === key) return bgCache;
+    var off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    drawBounceBackground(off.getContext('2d'), w, h);
+    bgCache = off;
+    bgCacheKey = key;
+    return bgCache;
+  }
+
+  function stepPhysics(){
+    var w = canvas.width, h = canvas.height;
+    sprites.forEach(function(s){
+      s.x += s.vx; s.y += s.vy;
+      if(s.x - s.r < 0){ s.x = s.r; s.vx = Math.abs(s.vx); }
+      if(s.x + s.r > w){ s.x = w - s.r; s.vx = -Math.abs(s.vx); }
+      if(s.y - s.r < 0){ s.y = s.r; s.vy = Math.abs(s.vy); }
+      if(s.y + s.r > h){ s.y = h - s.r; s.vy = -Math.abs(s.vy); }
+    });
+    if(sprites.length === 2){
+      var a = sprites[0], b = sprites[1];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+      var minDist = a.r + b.r;
+      if(dist < minDist){
+        var nx = dx/dist, ny = dy/dist;
+        var overlap = (minDist - dist)/2;
+        a.x -= nx*overlap; a.y -= ny*overlap;
+        b.x += nx*overlap; b.y += ny*overlap;
+        var avn = a.vx*nx + a.vy*ny, bvn = b.vx*nx + b.vy*ny;
+        var avt_x = a.vx - avn*nx, avt_y = a.vy - avn*ny;
+        var bvt_x = b.vx - bvn*nx, bvt_y = b.vy - bvn*ny;
+        a.vx = avt_x + bvn*nx; a.vy = avt_y + bvn*ny;
+        b.vx = bvt_x + avn*nx; b.vy = bvt_y + avn*ny;
+      }
+    }
+  }
+
+  function drawBounceFrame(c, w, h){
+    c.drawImage(getBackgroundCache(w,h), 0, 0);
+    sprites.forEach(function(s){
+      c.save();
+      c.beginPath(); c.arc(s.x, s.y, s.r, 0, Math.PI*2); c.closePath();
+      c.clip();
+      var d = s.r*2;
+      c.drawImage(s.img, s.x-s.r, s.y-s.r, d, d);
+      c.restore();
+    });
+  }
+
+  function isInterlaced(){
+    var f = FORMATS[state.format] || FORMATS['1080i60'];
+    return !!f.interlace;
+  }
+
+  // For an interlaced format, actually render two fields -- physics
+  // steps twice, once per field -- and weave them together by scanline,
+  // same as a real interlaced graphics/CG chain. A moving object then
+  // shows the normal, expected interlace "feathering" instead of random
+  // tearing from a progressive buffer being split by the display at
+  // some point mid-update.
+  var fieldA = null, fieldB = null, fieldCtxA = null, fieldCtxB = null;
+  function ensureFieldBuffers(w, h){
+    if(fieldA && fieldA.width === w && fieldA.height === h) return;
+    fieldA = document.createElement('canvas'); fieldA.width = w; fieldA.height = h;
+    fieldB = document.createElement('canvas'); fieldB.width = w; fieldB.height = h;
+    fieldCtxA = fieldA.getContext('2d');
+    fieldCtxB = fieldB.getContext('2d');
+  }
+
+  function weaveFields(w, h){
+    var imgA = fieldCtxA.getImageData(0,0,w,h);
+    var imgB = fieldCtxB.getImageData(0,0,w,h);
+    var out = ctx.createImageData(w,h);
+    var rowBytes = w*4;
+    for(var y=0; y<h; y++){
+      var src = (y % 2 === 0) ? imgA : imgB;
+      var off = y*rowBytes;
+      out.data.set(src.data.subarray(off, off+rowBytes), off);
+    }
+    ctx.putImageData(out, 0, 0);
+  }
+
+  // --- frame-timing telemetry: logs real tick intervals to the server
+  // so we can see actual frame pacing without needing eyes on the screen.
+  var telemetryDeltas = [];
+  var telemetryPhases = { bgCache: [], sprites: [], physics: [] };
+  var telemetryLastT = null;
+  var telemetryLastSent = 0;
+  function avgOf(arr){ return arr.length ? (arr.reduce(function(a,b){return a+b;},0)/arr.length) : 0; }
+  function recordTelemetry(now){
+    if(telemetryLastT !== null){
+      telemetryDeltas.push(now - telemetryLastT);
+    }
+    telemetryLastT = now;
+    if(now - telemetryLastSent > 3000 && telemetryDeltas.length > 5){
+      var d = telemetryDeltas;
+      var avg = avgOf(d);
+      var min = Math.min.apply(null,d), max = Math.max.apply(null,d);
+      var variance = d.reduce(function(a,b){return a+(b-avg)*(b-avg);},0)/d.length;
+      var stddev = Math.sqrt(variance);
+      var over33 = d.filter(function(x){return x>33;}).length;
+      fetch('/api/telemetry', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({n:d.length, avg:avg.toFixed(1), min:min.toFixed(1), max:max.toFixed(1),
+          stddev:stddev.toFixed(1), over33ms:over33, interlace:isInterlaced(), format:state.format,
+          physics_ms: avgOf(telemetryPhases.physics).toFixed(2),
+          bgcache_ms: avgOf(telemetryPhases.bgCache).toFixed(2),
+          sprites_ms: avgOf(telemetryPhases.sprites).toFixed(2)})
+      }).catch(function(){});
+      telemetryDeltas = [];
+      telemetryPhases = { bgCache: [], sprites: [], physics: [] };
+      telemetryLastSent = now;
+    }
+  }
+
+  function tick(){
+    var now = performance.now();
+    recordTelemetry(now);
+    var w = canvas.width, h = canvas.height;
+
+    var t0 = performance.now();
+    stepPhysics();
+    var t1 = performance.now();
+    ctx.drawImage(getBackgroundCache(w,h), 0, 0);
+    var t2 = performance.now();
+    sprites.forEach(function(s){
+      ctx.save();
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.closePath();
+      ctx.clip();
+      var d = s.r*2;
+      ctx.drawImage(s.img, s.x-s.r, s.y-s.r, d, d);
+      ctx.restore();
+    });
+    var t3 = performance.now();
+    telemetryPhases.physics.push(t1-t0);
+    telemetryPhases.bgCache.push(t2-t1);
+    telemetryPhases.sprites.push(t3-t2);
+
+    rafId = requestAnimationFrame(tick);
+  }
+  function startBounce(){
+    if(!rafId){
+      // telemetryLastT is stale after any time spent outside bounce mode --
+      // without this reset, the very first tick() back in bounce mode would
+      // diff against a timestamp from however long ago bounce was paused,
+      // reporting a bogus multi-second (or multi-hour) "frame" that never
+      // actually happened.
+      telemetryLastT = null;
+      telemetryLastSent = performance.now();
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+  function stopBounce(){
+    if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // Bars mode is otherwise static (rendered once per state push), so a
+  // clock element needs its own tick to actually advance on screen.
+  setInterval(function(){
+    if(state.mode === 'bars' && state.barsPattern === 'custom' &&
+       (state.customElements||[]).some(function(e){ return e.type==='clock'; })){
+      renderBars();
+    }
+  }, 1000);
+
+  // =========================================================
+  // apply full state (called on load and on every server push)
+  // =========================================================
+  function applyState(partial){
+    Object.assign(state, partial);
+    applyFormat();
+
+    if(state.mode === 'screensaver'){
+      stopBounce();
+      canvas.style.display = 'none';
+      screensaverFrame.style.display = 'block';
+      if(loadedScreensaver !== state.screensaver || loadedScreensaverLogo !== state.screensaverLogo){
+        // Cache-bust: re-assigning the exact same src string is a no-op in
+        // most browsers, so a logo-only change (same screensaver name)
+        // would otherwise never force the iframe to refetch the image.
+        screensaverFrame.src = SCREENSAVER_BASE + state.screensaver + '.html?v=' + Date.now();
+        loadedScreensaver = state.screensaver;
+        loadedScreensaverLogo = state.screensaverLogo;
+      }
+      return;
+    }
+    screensaverFrame.style.display = 'none';
+    canvas.style.display = 'block';
+
+    ensureLogoImage('A', state.logoA, function(){
+      ensureLogoImage('B', state.logoB, function(){
+        layoutBounceSprites(true);
+        if(state.mode === 'bounce'){
+          stopBounce();
+          startBounce();
+        } else {
+          stopBounce();
+          renderBars();
+        }
+      });
+    });
+  }
+
+  fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
+    applyState(s);
+    var es = new EventSource('/api/stream');
+    es.onmessage = function(ev){
+      try{
+        var data = JSON.parse(ev.data);
+        var speedChanged = data.speed !== state.speed;
+        applyState(data);
+        if(speedChanged){ applySpeedToSprites(); }
+      }catch(e){}
+    };
+  });
+})();
+</script>
+</body>
+</html>

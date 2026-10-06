@@ -1,12 +1,16 @@
-# NEP Kommentatorkit – Satellite Pi
+# NEP Kommentatorkit
 
-Automatisk installasjon av failover, health API og NEP-logo på Satellite Pi-er.
+Automatisk installasjon av hele kittet: Satellite Pi-er (failover, health
+API, NEP-logo) og Companion Pi (health API, RAM-database, testbildegenerator
+med kiosk-visning). Bygg et nytt kit ved å kjøre riktig installer på hver Pi.
 
 ## Struktur
 
 ```
 nep-kommentatorkit/
-├── install.sh                        # Hovedinstaller
+├── install.sh                        # Satellite Pi-installer
+├── install-companion.sh              # Companion Pi-installer
+├── install-health.sh                 # Health API alene (delt av begge over)
 ├── scripts/
 │   ├── nep-ts-failover.sh            # Failover script (LAN → Tailscale)
 │   └── cards.js                      # Companion Satellite splash screen
@@ -19,11 +23,13 @@ nep-kommentatorkit/
 │   └── health.py                     # Health API (port 8080)
 ├── companion/
 │   └── ...                           # RAM-database for Companion Pi (se companion/README.md)
+├── testbilde/
+│   └── ...                           # Testbildegenerator + kiosk for Companion Pi (se testbilde/README.md)
 └── assets/
     └── nep-logo.png                  # NEP-logo for Stream Deck splash
 ```
 
-## Installasjon på ny Pi
+## Installasjon på ny Satellite Pi
 
 > Forutsetter at Companion Satellite allerede er installert.
 
@@ -32,6 +38,20 @@ curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/insta
 ```
 
 Følg instruksjonene – du velger Pi-nummer og logger inn på Tailscale.
+
+## Installasjon på ny Companion Pi
+
+> Forutsetter at Bitfocus Companion allerede er installert og kjører
+> (`systemctl status companion`), og at HDMI→SDI-converteren er tilkoblet
+> hvis du vil bruke testbildegeneratoren.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install-companion.sh | bash
+```
+
+Se [`testbilde/README.md`](testbilde/README.md) for detaljer om hva
+testbildegeneratoren gjør, og [`companion/README.md`](companion/README.md)
+for RAM-databasen.
 
 ## Hva scriptet gjør
 
@@ -80,9 +100,9 @@ Scriptet kopierer den til `/opt/companion-satellite/satellite/assets/icon.png`.
 
 ## Companion Pi — RAM-database
 
-Companion Pi (hoved-noden, ikke Satelitt Pi-ene) har en separat,
-manuelt installert fiks for å unngå at periodiske databasebackuper
-blokkerer Node.js sin event loop og dropper alle Satelitt Pi-er
-samtidig. Se [`companion/README.md`](companion/README.md) — inkludert
-en kjent regresjon som dukker opp igjen ved hver `companion-update`
+`install-companion.sh` setter dette opp automatisk hvis USB-disken
+allerede er montert på `/home/companion`. Unngår at periodiske
+databasebackuper blokkerer Node.js sin event loop og dropper alle
+Satelitt Pi-er samtidig. Se [`companion/README.md`](companion/README.md)
+for detaljer — inkludert en kjent regresjon som dukker opp igjen ved hver `companion-update`
 med mindre `companion-ramdb.service` restartes etterpå.

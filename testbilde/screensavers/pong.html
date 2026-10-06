@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="transparent" content="true" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pong Screensaver</title>
+  <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="common.js"></script>
+    <script>
+      ;(function () {
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        const dpr = window.devicePixelRatio || 1
+
+        let W = 0,
+          H = 0
+
+        const PADDLE_W_RATIO = 0.011
+        const PADDLE_H_RATIO = 0.15
+        let paddleW = 0,
+          paddleH = 0
+        const PADDLE_MARGIN = 30
+
+        const SHRINK_PER_HIT = 0.025
+        const MIN_PADDLE_SCALE = 0.25
+        let paddleScale = 1.0
+        let displayPaddleH = 0
+
+        const BALL_SIZE_RATIO = 0.013
+        let ballSize = 0
+        let ballX = 0,
+          ballY = 0
+        let ballDX = 0,
+          ballDY = 0
+        const INITIAL_BALL_SPEED = 400
+        const MAX_BALL_SPEED = 1000
+        const SPEED_STEP = 50
+
+        let leftY = 0,
+          rightY = 0
+        let rally = 0, rallyFlash = 0
+
+        let lastTime = 0
+
+        function createAI() {
+          return {
+            trackingSpeed: 250 + Math.random() * 60,
+            predictionFactor: 0.4 + Math.random() * 0.5,
+            missChance: 0.05 + Math.random() * 0.08,
+            targetY: 0,
+            errorMode: false,
+            errorTimer: 0,
+            errorOffset: 0,
+          }
+        }
+
+        const leftAI = createAI()
+        const rightAI = createAI()
+
+        function resize() {
+          W = window.innerWidth
+          H = window.innerHeight
+          resizeCanvas(canvas, ctx, dpr, W, H)
+
+          paddleW = Math.round(W * PADDLE_W_RATIO)
+          paddleH = Math.round(H * PADDLE_H_RATIO)
+          ballSize = Math.round(W * BALL_SIZE_RATIO)
+          updatePaddleScale()
+
+          leftY = Math.min(Math.max(leftY, displayPaddleH / 2), H - displayPaddleH / 2)
+          rightY = Math.min(Math.max(rightY, displayPaddleH / 2), H - displayPaddleH / 2)
+        }
+
+        function updatePaddleScale() {
+          paddleScale = Math.max(MIN_PADDLE_SCALE, 1 - rally * SHRINK_PER_HIT)
+          displayPaddleH = Math.round(paddleH * paddleScale)
+        }
+
+        function resetBall() {
+          rally = 0
+          paddleScale = 1.0
+          displayPaddleH = paddleH
+          ballX = W / 2
+          ballY = H / 2
+          const angle = wobble(-60, 60) * (Math.PI / 180)
+          const dir = Math.random() > 0.5 ? 1 : -1
+          ballDX = Math.cos(angle) * INITIAL_BALL_SPEED * dir
+          ballDY = Math.sin(angle) * INITIAL_BALL_SPEED
+        }
+
+        function updateAI(ai, paddleY, side) {
+          const ballComing = side === 'left' ? ballDX < 0 : ballDX > 0
+
+          if (ballComing) {
+            const paddleX = side === 'left' ? PADDLE_MARGIN + paddleW : W - PADDLE_MARGIN - paddleW
+            const distX = Math.abs(paddleX - ballX)
+            let predictedY = ballY
+            if (ballDX !== 0) {
+              const timeToReach = distX / Math.abs(ballDX)
+              predictedY = ballY + ballDY * timeToReach
+              if (predictedY < 0) predictedY = -predictedY
+              if (predictedY > H) predictedY = 2 * H - predictedY
+            }
+            ai.targetY = ballY + (predictedY - ballY) * ai.predictionFactor
+          } else {
+            ai.targetY = H / 2
+          }
+
+          if (!ai.errorMode) {
+            if (ballComing && Math.random() < ai.missChance * (1 / 60)) {
+              ai.errorMode = true
+              ai.errorTimer = 0.3 + Math.random() * 0.6
+              ai.errorOffset = wobble(-H * 0.3, H * 0.3)
+            }
+          }
+          if (ai.errorMode) {
+            ai.errorTimer -= 1 / 60
+            if (ai.errorTimer <= 0) {
+              ai.errorMode = false
+            } else {
+              if (Math.random() < 0.1) {
+                ai.errorOffset = wobble(-H * 0.3, H * 0.3)
+              }
+            }
+          }
+
+          const effectiveTarget = ai.errorMode ? ai.targetY + ai.errorOffset : ai.targetY
+          const diff = effectiveTarget - paddleY
+          const maxMove = ai.trackingSpeed * (1 / 60)
+          if (Math.abs(diff) < maxMove) {
+            return effectiveTarget
+          }
+          return paddleY + Math.sign(diff) * maxMove
+        }
+
+        resize()
+        resetBall()
+        leftY = H / 2
+        rightY = H / 2
+
+        window.addEventListener('resize', () => {
+          resize()
+          ballX = Math.min(Math.max(ballX, ballSize), W - ballSize)
+          ballY = Math.min(Math.max(ballY, ballSize), H - ballSize)
+        })
+
+        requestAnimationFrame(loop)
+
+        function loop(timestamp) {
+          if (lastTime === 0) lastTime = timestamp
+          const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
+          lastTime = timestamp
+
+          leftY = updateAI(leftAI, leftY, 'left')
+          rightY = updateAI(rightAI, rightY, 'right')
+
+          leftY = Math.min(Math.max(leftY, displayPaddleH / 2), H - displayPaddleH / 2)
+          rightY = Math.min(Math.max(rightY, displayPaddleH / 2), H - displayPaddleH / 2)
+
+          ballX += ballDX * dt
+          ballY += ballDY * dt
+
+          if (ballY - ballSize / 2 <= 0) {
+            ballY = ballSize / 2
+            ballDY = Math.abs(ballDY)
+          }
+          if (ballY + ballSize / 2 >= H) {
+            ballY = H - ballSize / 2
+            ballDY = -Math.abs(ballDY)
+          }
+
+          if (
+            ballX - ballSize / 2 <= PADDLE_MARGIN + paddleW &&
+            ballX + ballSize / 2 >= PADDLE_MARGIN &&
+            ballY + ballSize / 2 >= leftY - displayPaddleH / 2 &&
+            ballY - ballSize / 2 <= leftY + displayPaddleH / 2
+          ) {
+            ballX = PADDLE_MARGIN + paddleW + ballSize / 2
+            let hitPos = (ballY - leftY) / (displayPaddleH / 2)
+            hitPos += wobble(-0.25, 0.25)
+            hitPos = Math.min(Math.max(hitPos, -1.2), 1.2)
+            const angle = hitPos * (Math.PI / 3)
+            const speed = Math.min(
+              Math.sqrt(ballDX * ballDX + ballDY * ballDY) + SPEED_STEP,
+              MAX_BALL_SPEED
+            )
+            ballDX = Math.cos(angle) * speed
+            ballDY = Math.sin(angle) * speed
+            rally++
+            updatePaddleScale()
+          }
+
+          if (
+            ballX + ballSize / 2 >= W - PADDLE_MARGIN - paddleW &&
+            ballX - ballSize / 2 <= W - PADDLE_MARGIN &&
+            ballY + ballSize / 2 >= rightY - displayPaddleH / 2 &&
+            ballY - ballSize / 2 <= rightY + displayPaddleH / 2
+          ) {
+            ballX = W - PADDLE_MARGIN - paddleW - ballSize / 2
+            let hitPos = (ballY - rightY) / (displayPaddleH / 2)
+            hitPos += wobble(-0.25, 0.25)
+            hitPos = Math.min(Math.max(hitPos, -1.2), 1.2)
+            const angle = Math.PI - hitPos * (Math.PI / 3)
+            const speed = Math.min(
+              Math.sqrt(ballDX * ballDX + ballDY * ballDY) + SPEED_STEP,
+              MAX_BALL_SPEED
+            )
+            ballDX = Math.cos(angle) * speed
+            ballDY = Math.sin(angle) * speed
+            rally++
+            updatePaddleScale()
+          }
+
+          if (ballX + ballSize / 2 < 0 || ballX - ballSize / 2 > W) {
+            resetBall()
+          }
+
+          // ── Draw ─────────────────────────────────────────
+
+          ctx.clearRect(0, 0, W, H)
+
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(PADDLE_MARGIN, leftY - displayPaddleH / 2, paddleW, displayPaddleH)
+          ctx.fillRect(
+            W - PADDLE_MARGIN - paddleW,
+            rightY - displayPaddleH / 2,
+            paddleW,
+            displayPaddleH
+          )
+          ctx.fillRect(ballX - ballSize / 2, ballY - ballSize / 2, ballSize, ballSize)
+
+          requestAnimationFrame(loop)
+        }
+      })()
+    </script>
+
+</html>
