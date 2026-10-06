@@ -70,3 +70,17 @@ plukkes opp automatisk neste gang `companion-ramdb.service` kjører
 (eller bare reboot Companion Pi) slik at den nye versjonsmappen faktisk
 kommer inn i RAM — companion-update alene restarter kun `companion.service`,
 ikke `companion-ramdb.service`.
+
+## Kjent regresjon: race condition ved kald boot (2026-10-05)
+
+Ved et par reboots av Companion Pi feilet `companion-ramdb.service` helt
+stille (`ServiceResult=exit-code`, ingen mount) fordi USB-disken
+(`/home/companion`) av og til ikke er klar ennå når servicen kjører,
+selv med `After=local-fs.target`. Companion startet da opp mot ekte
+disk uten at noen merket det før neste backup tok flere sekunder igjen.
+
+**Fiksen:** `companion-ramdb-load.sh` prøver nå `findmnt` på nytt i opptil
+15 sekunder (1 forsøk/sek) før den gir opp, i stedet for å feile på første
+forsøk. Verifiser alltid etter en reboot:
+`mount | grep companion-nodejs` — skal vise `tmpfs`. Hvis ikke:
+`sudo systemctl stop companion && sudo /usr/local/sbin/companion-ramdb-load.sh && sudo systemctl start companion`.
