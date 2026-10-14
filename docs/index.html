@@ -129,10 +129,13 @@ a{color:inherit}
 .sec-title .count{color:var(--fg-faint);font-weight:500}
 
 /* ---------- Pi units: no boxes, columns of readings ---------- */
-.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:2rem 2.4rem;align-items:start}
-.unit{min-width:0;--tone:var(--cyan);--tone-glow:var(--cyan-glow)}
-.unit[data-health="warn"]{--tone:var(--amber);--tone-glow:var(--amber-glow)}
-.unit[data-health="critical"]{--tone:var(--red);--tone-glow:var(--red-glow)}
+/* Each Pi gets a thin left rule in its state color (the Verktøykasse
+   "bracket"), so neighbouring columns read as separate units instead of
+   one long table - still no boxes. */
+.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:3rem 3.4rem;align-items:start}
+.unit{min-width:0;padding-left:1.1rem;border-left:2px solid var(--tone-rule);--tone:var(--cyan);--tone-glow:var(--cyan-glow);--tone-rule:rgba(94,234,212,0.35)}
+.unit[data-health="warn"]{--tone:var(--amber);--tone-glow:var(--amber-glow);--tone-rule:rgba(232,168,85,0.5)}
+.unit[data-health="critical"]{--tone:var(--red);--tone-glow:var(--red-glow);--tone-rule:rgba(240,112,127,0.5)}
 
 .unit-head{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;column-gap:.8rem;padding:.2rem 0 .7rem;border-bottom:1px solid var(--line-strong);cursor:pointer}
 .led{width:10px;height:10px;border-radius:50%;background:var(--tone);box-shadow:0 0 0 3px rgba(255,255,255,.03),0 0 10px var(--tone-glow)}
@@ -177,7 +180,7 @@ a{color:inherit}
 .r-value.bad{color:var(--red)}
 .r-value.faint{color:var(--fg-faint)}
 .r-value.info{color:var(--info)}
-.r-inline{display:flex;align-items:baseline;gap:.4rem}
+.r-inline{display:flex;align-items:baseline;gap:.9rem}
 .r-inline .btn-hud{min-height:0;padding:.15rem .4rem;font-size:.64rem}
 
 /* route mode: three text choices, the active one lit */
