@@ -5,6 +5,10 @@
 COMPANION_LAN_IP="${COMPANION_LAN_IP:-192.168.8.101}"
 COMPANION_PORT="${COMPANION_PORT:-8000}"
 LAN_DEV="${LAN_DEV:-eth0}"
+# Optional second local interface (e.g. wlan0) tried only if LAN_DEV fails --
+# still counts as "LAN OK", Tailscale is only used if BOTH fail. Unset by
+# default so every other Satellite Pi's behavior is unchanged.
+LAN_DEV_FALLBACK="${LAN_DEV_FALLBACK:-}"
 TS_DEV="${TS_DEV:-tailscale0}"
 LOGTAG="${LOGTAG:-nep-ts-failover}"
 
@@ -78,11 +82,17 @@ clear_ts_route() {
 }
 
 net_sig() {
-    local ip4 link forced
+    local ip4 link forced ip4b linkb
     ip4="$(ip -4 addr show dev "$LAN_DEV" 2>/dev/null | awk '/inet /{print $2}' | head -n1 || true)"
     link="$(cat "/sys/class/net/$LAN_DEV/operstate" 2>/dev/null || echo "?")"
     forced=$(route_is_forced && echo 1 || echo 0)
-    echo "$LAN_DEV|$link|$ip4|forced=$forced"
+    if [ -n "$LAN_DEV_FALLBACK" ]; then
+        ip4b="$(ip -4 addr show dev "$LAN_DEV_FALLBACK" 2>/dev/null | awk '/inet /{print $2}' | head -n1 || true)"
+        linkb="$(cat "/sys/class/net/$LAN_DEV_FALLBACK/operstate" 2>/dev/null || echo "?")"
+        echo "$LAN_DEV|$link|$ip4|$LAN_DEV_FALLBACK|$linkb|$ip4b|forced=$forced"
+    else
+        echo "$LAN_DEV|$link|$ip4|forced=$forced"
+    fi
 }
 
 network_changed() {
@@ -97,8 +107,16 @@ network_changed() {
 }
 
 http_ok_via_lan() {
-    curl -sS -m 2 --connect-timeout 2 --interface "$LAN_DEV" -o /dev/null \
-        "http://$COMPANION_LAN_IP:$COMPANION_PORT/" 2>/dev/null
+    if curl -sS -m 2 --connect-timeout 2 --interface "$LAN_DEV" -o /dev/null \
+        "http://$COMPANION_LAN_IP:$COMPANION_PORT/" 2>/dev/null; then
+        return 0
+    fi
+    if [ -n "$LAN_DEV_FALLBACK" ]; then
+        curl -sS -m 2 --connect-timeout 2 --interface "$LAN_DEV_FALLBACK" -o /dev/null \
+            "http://$COMPANION_LAN_IP:$COMPANION_PORT/" 2>/dev/null
+        return $?
+    fi
+    return 1
 }
 
 restart_satellite() {
