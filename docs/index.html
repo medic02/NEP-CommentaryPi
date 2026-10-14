@@ -5,711 +5,543 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NEP Satellite Dashboard</title>
 <style>
-/* ── TOKENS ── */
+/*
+  Same dark "command core" HUD as the Verktøykasse Pi pages: no boxes,
+  sections are a small uppercase title with a hairline running out after
+  it, rows split by hairlines, text-only buttons. Color carries meaning:
+  cyan = OK on LAN, amber = running on Tailscale fallback, red = offline
+  or Stream Deck disconnected, slate = idle. Local font stacks only - the
+  kit often sits on show networks with no internet. No color-mix(), no emoji.
+*/
 :root{
-  --bg:#050810;
-  --surface:rgba(14,21,32,0.85);
-  --surface-solid:#0e1520;
-  --surface2:#131d2b;
-  --border:rgba(255,255,255,0.07);
-  --border-strong:rgba(255,255,255,0.12);
-  --green:#00d26a;--green-dim:rgba(0,210,106,0.08);--green-ring:rgba(0,210,106,0.25);
-  --orange:#f59e0b;--orange-dim:rgba(245,158,11,0.08);
-  --red:#ef4444;--red-dim:rgba(239,68,68,0.08);--red-ring:rgba(239,68,68,0.2);
-  --blue:#38bdf8;--blue-dim:rgba(56,189,248,0.08);--blue-ring:rgba(56,189,248,0.25);
-  --purple:#818cf8;--purple-dim:rgba(129,140,248,0.08);--purple-ring:rgba(129,140,248,0.25);
-  --text:#e2e8f0;--text2:#94a3b8;--muted:#475569;
-  --mono:'SF Mono','Fira Mono','Consolas',monospace;
-  --radius:14px;
+  font-size:16px;
+  color-scheme:dark;
+  --bg:#05080a;
+  --bg-raised:#0a1013;
+  --panel-hover:rgba(94,234,212,0.05);
+  --line:rgba(148,187,195,0.14);
+  --line-strong:rgba(148,187,195,0.28);
+  --fg:#dce9ea;
+  --fg-dim:#93a8ae;
+  --fg-faint:#6f858c;
+  --cyan:#5eead4; --cyan-soft:rgba(94,234,212,0.12); --cyan-glow:rgba(94,234,212,0.35);
+  --amber:#e8a855; --amber-soft:rgba(232,168,85,0.12); --amber-glow:rgba(232,168,85,0.4);
+  --red:#f0707f; --red-soft:rgba(240,112,127,0.12); --red-glow:rgba(240,112,127,0.4);
+  --slate:#7d939a;
+  --info:#8fb4d9;
+  --core:var(--cyan); --core-glow:var(--cyan-glow);
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  --sans:-apple-system,"Segoe UI","Helvetica Neue",Roboto,"DejaVu Sans",sans-serif;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+body[data-health="warn"]{--core:var(--amber);--core-glow:var(--amber-glow)}
+body[data-health="critical"]{--core:var(--red);--core-glow:var(--red-glow)}
+body[data-health="idle"]{--core:var(--slate);--core-glow:rgba(125,147,154,0.3)}
+
+*{box-sizing:border-box}
+html,body{min-height:100%}
 body{
-  background:var(--bg);
-  background-image:radial-gradient(ellipse 60% 50% at -5% -5%, rgba(56,189,248,0.04) 0%, transparent 60%);
-  color:var(--text);
-  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
-  min-height:100vh;
+  margin:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(94,234,212,0.045),transparent 70%),var(--bg);
+  background-attachment:fixed;
+  color:var(--fg);
+  font-family:var(--sans);
   -webkit-font-smoothing:antialiased;
 }
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:inherit}
 
-/* ── TOPBAR ── */
-.topbar{
-  height:56px;
-  background:rgba(5,8,16,0.75);
-  backdrop-filter:blur(20px) saturate(180%);
-  -webkit-backdrop-filter:blur(20px) saturate(180%);
-  border-bottom:1px solid var(--border);
-  padding:0 24px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:100;
+.stage{max-width:1480px;margin:0 auto;padding:1.6rem clamp(1rem,2.5vw,2rem) 1.2rem;display:flex;flex-direction:column;gap:1.6rem}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:.9rem;text-decoration:none}
+.brand-logo{height:22px;width:auto;display:block;opacity:.9}
+.brand-name{font-family:var(--mono);font-size:1rem;font-weight:700;letter-spacing:.12em;color:var(--fg)}
+.brand-name span{color:var(--cyan);font-weight:600}
+.brand-sub{margin-top:.3rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.brand:hover .brand-sub{color:var(--fg-dim)}
+.clock-block{text-align:right}
+.clock{font-family:var(--mono);font-size:1.9rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.clock small{font-size:1.05rem;color:var(--cyan);font-weight:500}
+.date-line{margin-top:.3rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-faint)}
+
+/* ---------- toolbar: production + text actions ---------- */
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem 1.2rem;flex-wrap:wrap;padding-bottom:.9rem;border-bottom:1px solid var(--line)}
+.actions{display:flex;flex-wrap:wrap;gap:.2rem}
+.btn-hud{
+  min-height:34px;padding:.4rem .6rem;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--fg-dim);background:transparent;border:none;border-radius:6px;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;gap:.4rem;
 }
-.logo{display:flex;align-items:center;gap:12px}
-.logo-img{height:22px;width:auto;object-fit:contain;display:block}
-.logo-divider{width:1px;height:20px;background:var(--border-strong);flex-shrink:0}
-.logo-label{font-size:.65em;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
-.logo-link{display:flex;align-items:center;gap:12px;text-decoration:none;border-radius:8px;padding:4px 6px;margin:-4px -6px;transition:background .15s}
-.logo-link:hover{background:rgba(255,255,255,0.06)}
-.logo-link:hover .logo-label::after{content:' · 📖 Manual';opacity:.6}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.summary{display:flex;gap:12px}
-.sum-item{display:flex;align-items:center;gap:5px;font-size:.75em;color:var(--text2)}
-.sum-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.btn-hud:hover{color:var(--cyan);background:var(--panel-hover)}
+.btn-hud.is-on{color:var(--cyan)}
+.btn-hud:disabled{opacity:.5;cursor:wait}
+.btn-hud-warn{color:var(--amber)}
+.btn-hud-warn:hover{color:var(--amber);background:var(--amber-soft)}
+.btn-hud-danger{color:var(--red)}
+.btn-hud-danger:hover{color:var(--red);background:var(--red-soft)}
+.arrow::after{content:" \2192";color:var(--fg-faint)}
 
-/* ── PRODUCTION SELECTOR ── */
-.prod-wrap{position:relative}
+.prod-wrap{position:relative;display:flex;align-items:baseline;gap:.7rem}
+.prod-label{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-faint)}
 .prod-btn{
-  display:flex;align-items:center;gap:6px;
-  background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);
-  color:var(--blue);font-size:.78em;font-weight:600;
-  padding:5px 12px;border-radius:7px;cursor:pointer;
-  white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;
-  transition:background .15s,border-color .15s;
+  font-family:var(--mono);font-size:.82rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--cyan);background:transparent;border:none;border-radius:6px;padding:.35rem .5rem;margin-left:-.5rem;cursor:pointer;
+  max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.prod-btn:hover{background:rgba(56,189,248,0.16);border-color:rgba(56,189,248,0.45)}
-.prod-btn .prod-icon{font-size:.85em;flex-shrink:0}
-.prod-btn .prod-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prod-btn .prod-arrow{font-size:.65em;flex-shrink:0;opacity:.7;transition:transform .15s}
-.prod-btn.open .prod-arrow{transform:rotate(180deg)}
+.prod-btn::after{content:" \25BE";color:var(--fg-faint)}
+.prod-btn:hover{background:var(--panel-hover)}
 .prod-dropdown{
-  display:none;position:absolute;top:calc(100% + 6px);right:0;
-  background:#0d1626;border:1px solid var(--border-strong);
-  border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);
-  min-width:220px;z-index:200;overflow:hidden;padding:4px 0;
+  display:none;position:absolute;top:calc(100% + .4rem);left:0;z-index:50;min-width:260px;padding:.4rem 0;
+  background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:10px;box-shadow:0 24px 60px rgba(0,0,0,.6);
 }
 .prod-dropdown.show{display:block}
-.prod-item{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 14px;font-size:.8em;cursor:pointer;
-  color:var(--text2);transition:background .12s;
-}
-.prod-item:hover{background:rgba(255,255,255,0.06);color:var(--text)}
-.prod-item.active{color:var(--blue);font-weight:600}
-.prod-item.active::after{content:'✓';margin-left:auto;font-size:.85em}
-.prod-divider{height:1px;background:var(--border);margin:4px 0}
-.prod-item.add{color:var(--green)}
-.prod-item.manage-item{color:var(--muted);font-size:.75em}
+.prod-item{padding:.55rem 1rem;font-family:var(--mono);font-size:.78rem;color:var(--fg-dim);cursor:pointer}
+.prod-item:hover{background:var(--panel-hover);color:var(--fg)}
+.prod-item.active{color:var(--cyan);font-weight:700}
+.prod-item.active::after{content:"  aktiv";font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
+.prod-item.add{color:var(--cyan)}
+.prod-item.quiet{color:var(--fg-faint)}
+.prod-divider{height:1px;margin:.4rem 0;background:var(--line)}
 
-/* ── PRODUCTION MODAL ── */
-.prod-modal-list{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.prod-row{
-  display:flex;align-items:center;gap:8px;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);
-  border-radius:8px;padding:8px 12px;
-}
-.prod-row.current-row{border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.05)}
-.prod-row-name{flex:1;font-size:.85em;font-weight:600;color:var(--text)}
-.prod-row-badge{font-size:.7em;color:var(--blue);background:rgba(56,189,248,0.1);
-  border:1px solid rgba(56,189,248,0.2);padding:1px 7px;border-radius:10px}
-.prod-row-btns{display:flex;gap:6px}
-.prod-row-btn{background:none;border:1px solid var(--border);color:var(--muted);
-  font-size:.72em;padding:3px 9px;border-radius:6px;cursor:pointer;transition:all .15s}
-.prod-row-btn:hover{border-color:var(--border-strong);color:var(--text)}
-.prod-row-btn.danger:hover{border-color:#ef4444;color:#ef4444}
+/* ---------- summary: big numbers under small labels ---------- */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1.2rem 2rem;align-items:end}
+.stat{min-width:0}
+.stat-label{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-dim)}
+.stat-value{margin-top:.25rem;font-family:var(--mono);font-size:2.2rem;line-height:1;font-weight:500;font-variant-numeric:tabular-nums;color:var(--fg)}
+.stat-value small{font-size:1rem;color:var(--fg-faint)}
+.stat.ok .stat-value{color:var(--cyan)}
+.stat.warn .stat-value{color:var(--amber)}
+.stat.critical .stat-value{color:var(--red)}
+.stat.zero .stat-value{color:var(--fg-faint)}
 
-/* ── BUTTONS ── */
-.btn{
-  background:rgba(255,255,255,0.04);
-  border:1px solid var(--border-strong);
-  color:var(--text2);
-  padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.78em;font-weight:500;
-  display:inline-flex;align-items:center;gap:6px;
-  transition:background .15s,border-color .15s,color .15s,transform .1s;
-  white-space:nowrap;
-}
-.btn:hover{background:rgba(255,255,255,0.08);border-color:var(--border-strong);color:var(--text);transform:translateY(-1px)}
-.btn:active{transform:translateY(0)}
+.overall{display:flex;align-items:center;gap:.7rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;color:var(--fg-dim)}
+.overall b{color:var(--core);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.overall-dot{width:10px;height:10px;border-radius:50%;background:var(--core);box-shadow:0 0 0 3px rgba(255,255,255,.04),0 0 12px var(--core-glow);animation:breathe 3.2s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:.3}}
 
-/* ── REFRESH RING ── */
-.refresh-ring{
-  width:14px;height:14px;border-radius:50%;
-  border:1.5px solid var(--muted);border-top-color:var(--green);
-  display:inline-block;transition:opacity .3s;flex-shrink:0;
-}
-.refresh-ring.spin{animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* ---------- section titles ---------- */
+.sec-title{display:flex;align-items:center;gap:.75rem;margin:0;font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--fg-dim)}
+.sec-title::after{content:"";flex:1;height:1px;background:var(--line)}
+.sec-title .count{color:var(--fg-faint);font-weight:500}
 
-/* ── GRID ── */
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  gap:18px;padding:24px;
-  align-items:start;
-}
+/* ---------- Pi units: no boxes, columns of readings ---------- */
+.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:2rem 2.4rem;align-items:start}
+.unit{min-width:0;--tone:var(--cyan);--tone-glow:var(--cyan-glow)}
+.unit[data-health="warn"]{--tone:var(--amber);--tone-glow:var(--amber-glow)}
+.unit[data-health="critical"]{--tone:var(--red);--tone-glow:var(--red-glow)}
 
-/* ── CARD ── */
-.card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  overflow:hidden;
-  position:relative;
-  backdrop-filter:blur(8px);
-  transition:transform .2s ease,box-shadow .2s ease,border-color .25s ease;
-}
-.card::before{
-  content:'';
-  position:absolute;top:0;left:0;right:0;height:2px;
-  border-radius:var(--radius) var(--radius) 0 0;
-  background:linear-gradient(90deg, var(--accent-a,transparent), var(--accent-b,transparent));
-  opacity:.9;
-}
-.card:hover{
-  transform:translateY(-3px);
-  box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,0.06);
-}
-.card.ok{--accent-a:var(--green);--accent-b:rgba(0,210,106,0.2);border-color:rgba(0,210,106,0.12)}
-.card.ts{--accent-a:var(--purple);--accent-b:rgba(129,140,248,0.2);border-color:rgba(129,140,248,0.12)}
-.card.offline{--accent-a:var(--red);--accent-b:rgba(239,68,68,0.2);border-color:rgba(239,68,68,0.1);opacity:.55}
-.card.sat-disc{--accent-a:var(--orange);--accent-b:rgba(245,158,11,0.2);border-color:rgba(245,158,11,0.15)}
+.unit-head{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;column-gap:.8rem;padding:.2rem 0 .7rem;border-bottom:1px solid var(--line-strong);cursor:pointer}
+.led{width:10px;height:10px;border-radius:50%;background:var(--tone);box-shadow:0 0 0 3px rgba(255,255,255,.03),0 0 10px var(--tone-glow)}
+.unit[data-health="ok"] .led{animation:breathe 3.2s ease-in-out infinite}
+.unit[data-health="critical"] .led{animation:blink 1.2s steps(1,end) infinite}
+.unit-name{font-family:var(--mono);font-size:.92rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit-host{margin-top:.2rem;font-family:var(--mono);font-size:.68rem;color:var(--fg-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit-state{font-family:var(--mono);font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tone);white-space:nowrap}
+.unit-state::after{content:" \25BE";color:var(--fg-faint);font-weight:400}
+.unit.collapsed .unit-state::after{content:" \25B8"}
+.unit.collapsed .unit-body{display:none}
+@media (hover:hover){.unit-head:hover .unit-name{color:var(--cyan)}}
 
-/* ── CARD TOP ── */
-.card-top{
-  padding:14px 16px 13px;
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-}
-.card-id{display:flex;align-items:center;gap:10px;min-width:0}
+.unit-body{padding-top:.4rem}
+.unit-offline{padding:.8rem 0 0;font-family:var(--mono);font-size:.76rem;color:var(--fg-faint)}
 
-/* ── STATUS DOT WITH RING PULSE ── */
-.status-dot{
-  width:10px;height:10px;border-radius:50%;flex-shrink:0;
-  position:relative;
-}
-.status-dot::after{
-  content:'';
-  position:absolute;inset:-3px;
-  border-radius:50%;
-  border:1px solid currentColor;
-  opacity:0;
-  animation:none;
-}
-.status-dot.online{
-  background:var(--green);
-  color:var(--green);
-  box-shadow:0 0 6px rgba(0,210,106,.4);
-}
-.status-dot.online::after{animation:ring-pulse-green 2s ease-out infinite}
-.status-dot.ts-mode{
-  background:var(--purple);
-  color:var(--purple);
-  box-shadow:0 0 6px rgba(129,140,248,.4);
-}
-.status-dot.ts-mode::after{animation:ring-pulse-purple 2s ease-out infinite}
-.status-dot.sat-disc{
-  background:var(--orange);
-  color:var(--orange);
-  box-shadow:0 0 6px rgba(245,158,11,.4);
-}
-.status-dot.sat-disc::after{animation:ring-pulse-orange 2s ease-out infinite}
-@keyframes ring-pulse-orange{
-  0%{inset:-3px;opacity:.7}
-  100%{inset:-9px;opacity:0}
-}
-.status-dot.offline{background:var(--red);color:var(--red)}
+/* temperature vital */
+.vital{padding:.7rem 0 .55rem;--vt:var(--cyan);--vtg:var(--cyan-glow)}
+.vital.is-warn{--vt:var(--amber);--vtg:var(--amber-glow)}
+.vital.is-critical{--vt:var(--red);--vtg:var(--red-glow)}
+.vital-row{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.vital-label{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim)}
+.vital-value{font-family:var(--mono);font-size:1.7rem;line-height:1.05;font-weight:500;font-variant-numeric:tabular-nums}
+.vital.is-warn .vital-value{color:var(--amber)}
+.vital.is-critical .vital-value{color:var(--red)}
+.vital-bar{margin-top:.45rem;height:2px;border-radius:1px;background:rgba(255,255,255,.08);overflow:hidden}
+.vital-bar>i{display:block;height:100%;background:var(--vt);box-shadow:0 0 10px var(--vtg);transition:width 600ms ease}
 
-@keyframes ring-pulse-green{
-  0%{inset:-3px;opacity:.7}
-  100%{inset:-9px;opacity:0}
-}
-@keyframes ring-pulse-purple{
-  0%{inset:-3px;opacity:.7}
-  100%{inset:-9px;opacity:0}
-}
+/* reading groups */
+.group-title{display:flex;align-items:center;gap:.6rem;margin:.9rem 0 .1rem;font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-faint);cursor:pointer;user-select:none}
+.group-title::after{content:"";flex:1;height:1px;background:var(--line)}
+.group-title:hover{color:var(--fg-dim)}
+.group.collapsed .group-body{display:none}
+.group.collapsed .group-title::before{content:"\25B8 ";}
 
-.card-name{font-weight:700;font-size:.92em;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card-host-row{display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}
-.card-host{font-size:.7em;color:var(--muted);font-family:var(--mono)}
+.reading{display:flex;align-items:baseline;justify-content:space-between;gap:.8rem;padding:.45rem 0;border-bottom:1px solid var(--line);min-width:0}
+.group-body .reading:last-child{border-bottom:none}
+.r-label{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint);flex-shrink:0}
+.r-value{min-width:0;font-family:var(--mono);font-size:.8rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.r-value.good{color:var(--cyan)}
+.r-value.warn{color:var(--amber)}
+.r-value.bad{color:var(--red)}
+.r-value.faint{color:var(--fg-faint)}
+.r-value.info{color:var(--info)}
+.r-inline{display:flex;align-items:baseline;gap:.4rem}
+.r-inline .btn-hud{min-height:0;padding:.15rem .4rem;font-size:.64rem}
 
-/* ── VIA BADGE ── */
-.via-badge{
-  font-size:.62em;font-weight:700;letter-spacing:.04em;
-  padding:1px 6px;border-radius:4px;white-space:nowrap;
+/* route mode: three text choices, the active one lit */
+.route-modes{display:flex;gap:.35rem;padding:.55rem 0 .2rem}
+.route-btn{
+  flex:1;min-height:30px;padding:.35rem .4rem;
+  font-family:var(--mono);font-size:.64rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--fg-faint);background:transparent;border:1px solid var(--line);border-radius:6px;cursor:pointer;
 }
-.via-badge.via-lan{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.2)}
-.via-badge.via-ts{background:rgba(129,140,248,0.1);color:var(--purple);border:1px solid rgba(129,140,248,0.2)}
+.route-btn:hover{color:var(--fg-dim);border-color:var(--line-strong)}
+.route-btn.is-active{color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan-glow)}
+.route-btn.is-active.ts{color:var(--amber);background:var(--amber-soft);border-color:var(--amber-glow)}
 
-/* ── CONN BADGE ── */
-.conn-badge{
-  font-size:.65em;font-weight:700;padding:3px 9px;border-radius:20px;
-  letter-spacing:.05em;white-space:nowrap;flex-shrink:0;
-}
-.cb-lan{background:rgba(56,189,248,0.07);color:var(--blue);border:1px solid rgba(56,189,248,0.2)}
-.cb-ts{background:rgba(129,140,248,0.07);color:var(--purple);border:1px solid rgba(129,140,248,0.2)}
-.cb-off{background:rgba(239,68,68,0.07);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+.unit-actions{display:flex;gap:.2rem;flex-wrap:wrap;margin:.6rem 0 0 -.6rem}
 
-/* ── CARD BODY ── */
-.card-body{padding:14px 16px}
-.section{margin-bottom:14px}
-.section:last-child{margin-bottom:0}
-.section-label{
-  font-size:.6em;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
-  color:var(--muted);
-  padding-bottom:6px;
-  border-bottom:1px solid var(--border);
-  margin-bottom:8px;
-  cursor:pointer;user-select:none;
-  display:flex;justify-content:space-between;align-items:center;
-}
-.section-label::after{content:'⌄';font-size:1.3em;transition:transform .2s;opacity:.4;line-height:1;font-weight:400;letter-spacing:0}
-.sec-collapsed .section-label::after{transform:rotate(-90deg)}
-.sec-collapsed .section-body{display:none}
-.sec-collapsed+.divider{display:none}
-.kv{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:2px 0;font-size:.8em;
-}
-.kv .k{color:var(--text2)}
-.kv .v{font-family:var(--mono);font-size:.9em;text-align:right}
-.v.green{color:var(--green)}.v.red{color:var(--red)}.v.orange{color:var(--orange)}
-.v.blue{color:var(--blue)}.v.purple{color:var(--purple)}.v.muted{color:var(--muted)}
-.divider{border:none;border-top:1px solid var(--border);margin:12px 0}
+/* ---------- other devices: one row each ---------- */
+.devices{display:flex;flex-direction:column}
+.device{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;align-items:center;column-gap:1.2rem;padding:.75rem .2rem;border-bottom:1px solid var(--line);--tone:var(--cyan);--tone-glow:var(--cyan-glow)}
+.device:last-child{border-bottom:none}
+.device[data-health="critical"]{--tone:var(--red);--tone-glow:var(--red-glow)}
+.device-name{font-family:var(--mono);font-size:.84rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-type{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-faint)}
+.device-ip{font-family:var(--mono);font-size:.76rem;color:var(--fg-dim);font-variant-numeric:tabular-nums}
+.device-state{font-family:var(--mono);font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tone);min-width:64px;text-align:right}
 
-.temp-bar{height:2px;border-radius:2px;margin-top:5px;transition:width .5s ease}
+/* ---------- manage list ---------- */
+.manage-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:1rem;padding:.7rem .2rem;border-bottom:1px solid var(--line)}
+.manage-row:last-child{border-bottom:none}
+.manage-name{font-family:var(--mono);font-size:.84rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.manage-addr{margin-top:.2rem;font-family:var(--mono);font-size:.7rem;color:var(--fg-faint)}
+.manage-actions{display:flex;gap:.2rem}
 
-/* ── ROUTE TOGGLE: segmented control ── */
-.route-toggle{
-  display:flex;
-  background:rgba(0,0,0,.3);
-  border:1px solid var(--border-strong);
-  border-radius:8px;
-  padding:3px;
-  gap:2px;
-  margin-top:8px;
-}
-.rtbtn{
-  flex:1;padding:4px 0;font-size:.72em;font-weight:600;
-  border-radius:5px;border:none;
-  background:transparent;color:var(--muted);
-  cursor:pointer;text-align:center;
-  transition:background .15s,color .15s,box-shadow .15s;
-}
-.rtbtn:hover:not([class*="active"]){background:rgba(255,255,255,0.06);color:var(--text2)}
-.rtbtn.active-auto{background:var(--green-dim);color:var(--green);box-shadow:0 0 0 1px rgba(0,210,106,0.25) inset}
-.rtbtn.active-lan{background:var(--blue-dim);color:var(--blue);box-shadow:0 0 0 1px rgba(56,189,248,0.25) inset}
-.rtbtn.active-ts{background:var(--purple-dim);color:var(--purple);box-shadow:0 0 0 1px rgba(129,140,248,0.25) inset}
+/* ---------- empty state ---------- */
+.empty{padding:3rem 0;text-align:center;font-family:var(--mono);font-size:.82rem;color:var(--fg-faint)}
+.empty .btn-hud{margin-top:.8rem}
 
-/* ── SSH BUTTON ── */
-.ssh-btn{
-  display:block;width:100%;margin-top:10px;
-  padding:7px 12px;font-size:.75em;font-weight:600;
-  font-family:var(--mono);
-  border-radius:7px;
-  border:1px solid var(--border-strong);
-  background:rgba(255,255,255,0.03);
-  color:var(--muted);
-  text-decoration:none;
-  text-align:center;
-  cursor:pointer;
-  transition:background .15s,color .15s,border-color .15s;
-}
-.ssh-btn:hover{background:rgba(255,255,255,0.07);color:var(--text);border-color:rgba(255,255,255,0.18)}
+/* ---------- terminal strip ---------- */
+.termbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem 1.4rem;flex-wrap:wrap;padding-top:.9rem;border-top:1px solid var(--line);font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--fg-faint)}
+.termbar b{color:var(--fg-dim);font-weight:600}
+.termbar-right{display:flex;gap:1.2rem;flex-wrap:wrap}
+.poll-dot{display:inline-block;width:6px;height:6px;margin-right:.4rem;border-radius:50%;background:var(--fg-faint);vertical-align:middle}
+.poll-dot.busy{background:var(--cyan);animation:blink .7s steps(1,end) infinite}
 
-/* ── MODAL ── */
-.modal-bg{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.65);
-  backdrop-filter:blur(6px);
-  -webkit-backdrop-filter:blur(6px);
-  z-index:200;align-items:center;justify-content:center;padding:20px;
-}
+/* ---------- modals ---------- */
+.modal-bg{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(2,4,5,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .modal-bg.show{display:flex}
 .modal{
-  background:var(--surface-solid);
-  border:1px solid var(--border-strong);
-  border-radius:16px;
-  width:100%;max-width:440px;
-  padding:28px;
-  animation:pop .2s cubic-bezier(.34,1.56,.64,1);
-  box-shadow:0 24px 80px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,0.04);
+  position:relative;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;padding:1.5rem;
+  background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 0 1px rgba(94,234,212,.04);
 }
-@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
-.modal h2{font-size:.95em;font-weight:700;margin-bottom:22px;color:var(--text);letter-spacing:.01em}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:.73em;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em}
-.field input{
-  width:100%;
-  background:rgba(0,0,0,.3);
-  border:1px solid var(--border-strong);
-  color:var(--text);
-  padding:9px 13px;border-radius:8px;
-  font-size:.88em;font-family:var(--mono);
-  transition:border-color .15s,box-shadow .15s;
+.modal.wide{max-width:660px}
+.modal h2{margin:0 0 1.1rem;font-family:var(--mono);font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.modal .hint{margin:-.4rem 0 1rem;font-size:.82rem;line-height:1.45;color:var(--fg-dim)}
+.modal .sec-title{margin:1.2rem 0 .3rem}
+.modal .sec-title:first-of-type{margin-top:0}
+.field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.9rem;font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint)}
+.field input,.num{
+  padding:.5rem .6rem;font-family:var(--mono);font-size:.84rem;letter-spacing:0;text-transform:none;
+  color:var(--fg);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;
 }
-.field input:focus{
-  outline:none;
-  border-color:rgba(56,189,248,0.5);
-  box-shadow:0 0 0 3px rgba(56,189,248,0.1);
-}
-.field input::placeholder{color:var(--muted);font-family:system-ui,sans-serif;font-size:.95em}
-.modal-actions{display:flex;gap:10px;margin-top:24px}
-.modal-actions .btn-primary{
-  flex:1;background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.35);
-  color:var(--blue);font-weight:700;justify-content:center;padding:10px;font-size:.83em;
-}
-.modal-actions .btn-primary:hover{background:rgba(56,189,248,0.18);border-color:rgba(56,189,248,0.5)}
-.modal-actions .btn-cancel{color:var(--muted);font-size:.83em}
-
-/* ── PI MANAGE ── */
-.pi-manage{padding:0 24px 32px}
-.pi-manage h3{
-  font-size:.6em;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
-  color:var(--muted);
-  padding-bottom:8px;border-bottom:1px solid var(--border);
-  margin-bottom:14px;
-}
-.pi-rows{display:flex;flex-direction:column;gap:8px}
-.pi-row{
-  background:rgba(14,21,32,0.7);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:11px 14px;
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
-  transition:border-color .15s;
-}
-.pi-row:hover{border-color:var(--border-strong)}
-.pi-row-info{display:flex;flex-direction:column;gap:3px;min-width:0}
-.pi-row-name{font-size:.85em;font-weight:600}
-.pi-row-ips{font-size:.7em;color:var(--muted);font-family:var(--mono)}
-.pi-row-actions{display:flex;gap:6px;flex-shrink:0}
-.btn-sm{padding:4px 10px;font-size:.72em}
-.btn-del{border-color:rgba(239,68,68,0.25);color:var(--red)}
-.btn-del:hover{background:var(--red-dim);border-color:rgba(239,68,68,0.4)}
-
-/* ── EMPTY STATE ── */
-.empty-state{
-  grid-column:1/-1;padding:70px 24px;text-align:center;color:var(--muted);
-}
-.empty-state .icon{font-size:2.8em;margin-bottom:16px;opacity:.25;display:block}
-.empty-state p{font-size:.88em;margin-bottom:20px;color:var(--muted)}
-.empty-state .btn{margin:0 auto;width:fit-content}
-
-/* ── COMMANDS MODAL ── */
-.cmd-modal{max-width:640px;max-height:85vh;overflow-y:auto}
-.cmd-section{margin-bottom:20px}
-.cmd-section:last-child{margin-bottom:0}
-.cmd-section-title{font-size:.65em;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-.cmd-row{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.cmd-row:last-child{margin-bottom:0}
-.cmd-info{flex:1;min-width:0}
-.cmd-label{font-size:.75em;color:var(--text2);margin-bottom:4px}
-.cmd-code{font-family:var(--mono);font-size:.72em;color:var(--green);word-break:break-all;white-space:pre-wrap}
-.cmd-copy{flex-shrink:0;padding:4px 10px;font-size:.7em;border-radius:5px;border:1px solid var(--border-strong);background:rgba(255,255,255,.04);color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
-.cmd-copy:hover{background:rgba(255,255,255,.08);color:var(--text)}
-.cmd-copy.copied{border-color:rgba(0,210,106,.3);color:var(--green)}
-
-/* ── DEVICE TYPE SELECTOR ── */
-.type-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px}
+.field input:focus,.num:focus{outline:none;border-color:var(--cyan-glow)}
+.field input::placeholder{color:var(--fg-faint)}
+.field .note{text-transform:none;letter-spacing:0;color:var(--fg-faint)}
+.type-row{display:flex;flex-wrap:wrap;gap:.35rem}
 .type-btn{
-  padding:8px 4px;font-size:.72em;font-weight:600;border-radius:8px;
-  border:1px solid var(--border-strong);background:rgba(255,255,255,0.03);
-  color:var(--text2);cursor:pointer;text-align:center;transition:all .15s;
-  display:flex;flex-direction:column;align-items:center;gap:3px;
+  flex:1;min-width:70px;min-height:32px;padding:.35rem .4rem;
+  font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--fg-faint);background:transparent;border:1px solid var(--line);border-radius:6px;cursor:pointer;
 }
-.type-btn .ticon{font-size:1.3em;line-height:1}
-.type-btn:hover{background:rgba(255,255,255,0.07);color:var(--text)}
-.type-btn.active{background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.35);color:var(--blue)}
+.type-btn:hover{color:var(--fg-dim);border-color:var(--line-strong)}
+.type-btn.active{color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan-glow)}
+.modal-actions{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap;margin-top:1.3rem}
+.btn-ghost{
+  padding:.5rem 1rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.04em;
+  color:var(--fg-dim);background:transparent;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;
+}
+.btn-ghost:hover{color:var(--fg);background:rgba(255,255,255,.04)}
+.btn-primary{
+  padding:.55rem 1.1rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--bg);background:var(--cyan);border:none;border-radius:8px;cursor:pointer;
+}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:disabled{opacity:.55;cursor:wait}
 
-/* ── UPDATE MODAL ── */
-.upd-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;max-height:60vh;overflow-y:auto}
-.upd-row{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.upd-name{font-size:.85em;font-weight:600}
-.upd-ver{font-size:.68em;color:var(--muted);font-family:var(--mono);margin-top:2px}
-.upd-state{font-size:.75em;font-weight:600;white-space:nowrap;flex-shrink:0}
-.upd-state.wait{color:var(--muted)}
-.upd-state.doing{color:var(--orange)}
-.upd-state.done{color:var(--green)}
-.upd-state.err{color:var(--red)}
-
-/* ── NOTIFICATIONS MODAL ── */
-.notif-section{margin-bottom:16px}
-.notif-section:last-of-type{margin-bottom:0}
-.notif-section-title{font-size:.6em;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
-.notif-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:.83em;color:var(--text2)}
-.notif-row .nr-label{flex:1}
-.notif-num{width:56px;background:rgba(0,0,0,.3);border:1px solid var(--border-strong);color:var(--text);padding:4px 8px;border-radius:6px;font-size:.9em;font-family:var(--mono);text-align:center}
-.notif-num:focus{outline:none;border-color:rgba(56,189,248,0.5)}
-/* Toggle switch */
+/* toggles: a row with a text switch on the right */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--line);font-size:.84rem;color:var(--fg-dim)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-row.strong{color:var(--fg);font-weight:600}
 .sw{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0}
 .sw input{opacity:0;width:0;height:0}
-.sw-track{position:absolute;inset:0;border-radius:20px;background:rgba(255,255,255,.1);border:1px solid var(--border-strong);cursor:pointer;transition:background .2s}
-.sw input:checked+.sw-track{background:rgba(0,210,106,0.35);border-color:rgba(0,210,106,0.5)}
-.sw-track::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#94a3b8;top:2px;left:2px;transition:transform .2s,background .2s}
-.sw input:checked+.sw-track::after{transform:translateX(16px);background:var(--green)}
-.notif-test-result{font-size:.75em;margin-top:6px;min-height:1.2em}
+.sw-track{position:absolute;inset:0;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid var(--line-strong);cursor:pointer;transition:background .2s,border-color .2s}
+.sw-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--fg-faint);transition:transform .2s,background .2s}
+.sw input:checked+.sw-track{background:var(--cyan-soft);border-color:var(--cyan-glow)}
+.sw input:checked+.sw-track::after{transform:translateX(16px);background:var(--cyan)}
+.sw input:focus-visible+.sw-track{outline:2px solid var(--cyan);outline-offset:2px}
+.num-wrap{display:flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.74rem;color:var(--fg-faint)}
+.num{width:64px;text-align:center}
+.result{min-height:1.2em;margin-top:.4rem;font-family:var(--mono);font-size:.74rem}
+.result.ok{color:var(--cyan)} .result.err{color:var(--red)}
 
-/* ── NEP MODE BUTTON ── */
-.mode-btn{
-  font-size:.65em;font-weight:600;
-  padding:2px 8px;border-radius:4px;
-  border:1px solid var(--border-strong);
-  background:rgba(255,255,255,.04);
-  color:var(--text2);cursor:pointer;
-  transition:all .15s;white-space:nowrap;
-  line-height:1.6;
-}
-.mode-btn:hover{background:rgba(255,255,255,.08);color:var(--text);border-color:rgba(255,255,255,.18)}
+/* commands */
+.cmd-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:.8rem;padding:.65rem 0;border-bottom:1px solid var(--line)}
+.cmd-row:last-child{border-bottom:none}
+.cmd-label{font-size:.78rem;color:var(--fg-dim)}
+.cmd-label .warn{color:var(--amber)}
+.cmd-code{margin-top:.3rem;font-family:var(--mono);font-size:.72rem;color:var(--cyan);white-space:pre-wrap;word-break:break-all;user-select:text;-webkit-user-select:text}
+.cmd-copy{min-height:0;padding:.25rem .5rem;font-size:.64rem}
+.cmd-copy.copied{color:var(--cyan)}
 
-/* ── CARD COLLAPSE ── */
-.card-top{cursor:pointer}
-.card-top .collapse-arrow{font-size:.85em;opacity:.35;transition:transform .2s;margin-left:6px;flex-shrink:0}
-.card-collapsed .card-top .collapse-arrow{transform:rotate(-90deg)}
-.card-collapsed .card-body{display:none}
+/* update + productions lists */
+.list-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--line)}
+.list-row:last-child{border-bottom:none}
+.list-name{font-family:var(--mono);font-size:.82rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.list-sub{margin-top:.2rem;font-family:var(--mono);font-size:.68rem;color:var(--fg-faint)}
+.list-row.current .list-name{color:var(--cyan)}
+.badge{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+.upd-state{font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.06em;white-space:nowrap}
+.upd-state.wait{color:var(--fg-faint)} .upd-state.doing{color:var(--amber)} .upd-state.done{color:var(--cyan)} .upd-state.err{color:var(--red)}
+.row-actions{display:flex;gap:.2rem;flex-wrap:wrap;justify-content:flex-end}
+.row-actions .btn-hud{min-height:0;padding:.25rem .45rem;font-size:.64rem}
 
-/* ── DEVICE CARD (ping-only) ── */
-.dcard{
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;position:relative;backdrop-filter:blur(8px);
-  transition:transform .2s ease,box-shadow .2s ease;
+/* ---------- responsive ---------- */
+@media (max-width:640px){
+  .clock{font-size:1.5rem}
+  .units{grid-template-columns:minmax(0,1fr)}
+  .device{grid-template-columns:12px minmax(0,1fr) auto;row-gap:.3rem}
+  .device-ip{grid-column:2}
 }
-.dcard::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,var(--dacca,transparent),transparent);
-}
-.dcard:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
-.dcard.d-online{--dacca:var(--green);border-color:rgba(0,210,106,0.12)}
-.dcard.d-offline{--dacca:var(--red);border-color:rgba(239,68,68,0.1);opacity:.55}
-.dcard-inner{padding:16px;display:flex;align-items:center;gap:14px}
-.dcard-icon{font-size:1.8em;line-height:1;flex-shrink:0;opacity:.85}
-.dcard-info{flex:1;min-width:0}
-.dcard-name{font-weight:700;font-size:.92em;margin-bottom:3px}
-.dcard-ip{font-size:.72em;color:var(--muted);font-family:var(--mono)}
-.dcard-status{font-size:.72em;font-weight:600;margin-top:4px}
-.dcard-status.online{color:var(--green)}
-.dcard-status.offline{color:var(--red)}
-.dcard-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.dcard-dot.online{background:var(--green);box-shadow:0 0 6px rgba(0,210,106,.4);animation:ring-pulse-green 2s ease-out infinite}
-.dcard-dot.offline{background:var(--red)}
-.dcard{cursor:pointer}
-.dcard-collapsed .dcard-ip,.dcard-collapsed .dcard-status{display:none}
-.dcard-collapsed .dcard-icon{display:none}
-.dcard-collapsed .dcard-inner{padding:10px 14px}
-.dcard .collapse-arrow{font-size:.85em;opacity:.3;transition:transform .2s;margin-left:auto;flex-shrink:0}
-.dcard-collapsed .collapse-arrow{transform:rotate(-90deg)}
 </style>
 </head>
-<body>
+<body data-health="idle">
+<div class="stage">
 
-<!-- ── TOPBAR ── -->
-<div class="topbar">
-  <a href="/manual" target="_blank" class="logo-link" title="Åpne manual">
-    <img src="/logo.png" onerror="this.style.display='none'" alt="NEP" class="logo-img">
-    <div class="logo-divider"></div>
-    <span class="logo-label">Satellite Dashboard</span>
-  </a>
-  <div class="topbar-right">
-    <div class="summary" id="summary"></div>
-    <span id="refresh-ring" class="refresh-ring"></span>
-    <!-- Production selector -->
+  <header class="topbar">
+    <a href="/manual" target="_blank" class="brand" title="Åpne manualen">
+      <img src="/logo.png" alt="NEP" class="brand-logo" onerror="this.remove()">
+      <div>
+        <div class="brand-name">NEP <span>// KOMMENTATORKIT</span></div>
+        <div class="brand-sub">Satellite dashboard · manual</div>
+      </div>
+    </a>
+    <div class="clock-block">
+      <div class="clock" id="clock">--:--<small>:--</small></div>
+      <div class="date-line" id="date-line">&nbsp;</div>
+    </div>
+  </header>
+
+  <nav class="toolbar">
     <div class="prod-wrap" id="prod-wrap">
-      <button class="prod-btn" id="prod-btn" onclick="toggleProdDropdown()">
-        <span class="prod-icon">🎬</span>
-        <span class="prod-name" id="prod-current-name">Standard</span>
-        <span class="prod-arrow">▼</span>
-      </button>
+      <span class="prod-label">Produksjon</span>
+      <button class="prod-btn" id="prod-btn" onclick="toggleProdDropdown()"><span id="prod-current-name">Standard</span></button>
       <div class="prod-dropdown" id="prod-dropdown">
         <div id="prod-list"></div>
         <div class="prod-divider"></div>
-        <div class="prod-item add" onclick="closeProdDropdown();promptNewProd()">＋ Ny produksjon</div>
-        <div class="prod-item manage-item" onclick="closeProdDropdown();openProdModal()">⚙ Administrer produksjoner</div>
+        <div class="prod-item add" onclick="closeProdDropdown();promptNewProd()">+ Ny produksjon</div>
+        <div class="prod-item quiet" onclick="closeProdDropdown();openProdModal()">Administrer produksjoner</div>
       </div>
     </div>
-    <button class="btn" onclick="openAdd()">＋ Legg til Pi</button>
-    <button class="btn" onclick="toggleManage()" id="manage-btn">Administrer</button>
-    <button class="btn" onclick="openNotif()">🔔 Varsler</button>
-    <button class="btn" onclick="openUpdate()">⬆ Oppdater alle</button>
-    <button class="btn" onclick="openCmds()">⌨ Kommandoer</button>
-  </div>
+    <div class="actions">
+      <button class="btn-hud" onclick="openAdd()">+ Legg til enhet</button>
+      <button class="btn-hud" onclick="toggleManage()" id="manage-btn">Administrer</button>
+      <button class="btn-hud" onclick="openNotif()">Varsler</button>
+      <button class="btn-hud" onclick="openUpdate()">Oppdater alle</button>
+      <button class="btn-hud" onclick="openCmds()">Kommandoer</button>
+    </div>
+  </nav>
+
+  <section class="summary" id="summary" aria-live="polite"></section>
+
+  <section id="pi-section">
+    <h2 class="sec-title">Pi-er <span class="count" id="pi-count"></span></h2>
+    <div class="units" id="grid" style="margin-top:1rem"></div>
+  </section>
+
+  <section id="dev-section" hidden>
+    <h2 class="sec-title">Andre enheter <span class="count" id="dev-count"></span></h2>
+    <div class="devices" id="devices" style="margin-top:.4rem"></div>
+  </section>
+
+  <section id="pi-manage" hidden>
+    <h2 class="sec-title">Konfigurerte enheter</h2>
+    <div id="pi-rows" style="margin-top:.4rem"></div>
+  </section>
+
+  <footer class="termbar">
+    <div><span class="poll-dot" id="refresh-ring"></span>Oppdaterer hvert 5. sekund · sist <b id="last-poll">–</b></div>
+    <div class="termbar-right">
+      <span>Dashboard <b id="dash-host">–</b></span>
+      <span>Produksjon <b id="term-prod">–</b></span>
+    </div>
+  </footer>
+
 </div>
 
-<!-- ── GRID ── -->
-<div class="grid" id="grid"></div>
-
-<!-- ── PI MANAGE ── -->
-<div class="pi-manage" id="pi-manage" style="display:none">
-  <h3>Konfigurerte Pi-er</h3>
-  <div class="pi-rows" id="pi-rows"></div>
-</div>
-
-<!-- ── MODAL ── -->
-<div class="modal-bg" id="modal" onclick="e=>e.target===this&&closeModal()">
+<!-- ADD / EDIT -->
+<div class="modal-bg" id="modal">
   <div class="modal" onclick="event.stopPropagation()">
     <h2 id="modal-title">Legg til enhet</h2>
-    <div class="field">
-      <label>Type</label>
-      <div class="type-grid" id="type-grid">
-        <button type="button" class="type-btn active" onclick="setDevType('pi')"><span class="ticon">🖥</span>Pi</button>
-        <button type="button" class="type-btn" onclick="setDevType('switch')"><span class="ticon">🔀</span>Switch</button>
-        <button type="button" class="type-btn" onclick="setDevType('router')"><span class="ticon">📡</span>Ruter</button>
-        <button type="button" class="type-btn" onclick="setDevType('videohub')"><span class="ticon">🎬</span>Videohub</button>
-        <button type="button" class="type-btn" onclick="setDevType('device')"><span class="ticon">⚡</span>Annen</button>
+    <div class="field">Type
+      <div class="type-row" id="type-grid">
+        <button type="button" class="type-btn active" data-type="pi" onclick="setDevType('pi')">Pi</button>
+        <button type="button" class="type-btn" data-type="switch" onclick="setDevType('switch')">Switch</button>
+        <button type="button" class="type-btn" data-type="router" onclick="setDevType('router')">Ruter</button>
+        <button type="button" class="type-btn" data-type="videohub" onclick="setDevType('videohub')">Videohub</button>
+        <button type="button" class="type-btn" data-type="device" onclick="setDevType('device')">Annen</button>
       </div>
     </div>
-    <div class="field">
-      <label>Navn (valgfritt)</label>
-      <input id="f-name" type="text" placeholder="Switch 1">
-    </div>
+    <label class="field">Navn (valgfritt)<input id="f-name" type="text" placeholder="Satellite Pi 1"></label>
     <div id="pi-fields">
-      <div class="field">
-        <label>LAN IP <span style="color:var(--muted);font-weight:400">(port 8080 legges til automatisk)</span></label>
-        <input id="f-lan" type="text" placeholder="192.168.8.104">
-      </div>
-      <div class="field">
-        <label>Tailscale IP</label>
-        <input id="f-ts" type="text" placeholder="100.x.x.x">
-      </div>
+      <label class="field">LAN-IP <span class="note">port 8080 legges til automatisk</span><input id="f-lan" type="text" placeholder="192.168.8.104"></label>
+      <label class="field">Tailscale-IP<input id="f-ts" type="text" placeholder="100.x.x.x"></label>
     </div>
-    <div id="device-fields" style="display:none">
-      <div class="field">
-        <label>IP-adresse</label>
-        <input id="f-ip" type="text" placeholder="192.168.8.10">
-      </div>
+    <div id="device-fields" hidden>
+      <label class="field">IP-adresse<input id="f-ip" type="text" placeholder="192.168.8.10"></label>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-cancel" onclick="closeModal()">Avbryt</button>
-      <button class="btn btn-primary" onclick="savePi()">Lagre</button>
+      <button class="btn-ghost" onclick="closeModal()">Avbryt</button>
+      <button class="btn-primary" onclick="savePi()">Lagre</button>
     </div>
   </div>
 </div>
 
-<!-- ── COMMANDS MODAL ── -->
-<div class="modal-bg" id="cmd-modal" onclick="if(event.target===this)closeCmds()">
-  <div class="modal cmd-modal" onclick="event.stopPropagation()">
+<!-- COMMANDS -->
+<div class="modal-bg" id="cmd-modal">
+  <div class="modal wide" onclick="event.stopPropagation()">
     <h2>Kommandoer</h2>
 
-    <div class="cmd-section">
-      <div class="cmd-section-title">🚀 Installasjon</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Ny Satellite Pi (full install)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Companion Pi / kun Health API</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install-health.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Aktiver SSH på SD-kort ⚠️ Kjøres på Mac, ikke Pi</div><div class="cmd-code">touch /Volumes/bootfs/ssh</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Tailscale – logg inn</div><div class="cmd-code">sudo tailscale up</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Tailscale – aksepter subnet routes</div><div class="cmd-code">sudo tailscale set --accept-routes=true --accept-dns=false</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Sett tidssone (Norge)</div><div class="cmd-code">sudo timedatectl set-timezone Europe/Oslo</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
+    <h3 class="sec-title">Installasjon</h3>
+    <div class="cmd-row"><div><div class="cmd-label">Ny Satellite Pi (full installasjon)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install.sh | bash</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Ny Companion Pi (health, RAM-database, testbilde, kiosk)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install-companion.sh | bash</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Kun Health API</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/install-health.sh | bash</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Aktiver SSH på SD-kortet <span class="warn">kjøres på Mac, ikke på Pi</span></div><div class="cmd-code">touch /Volumes/bootfs/ssh</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Tailscale: logg inn</div><div class="cmd-code">sudo tailscale up</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Tailscale: godta subnet-ruter (kun Satellite Pi, ikke Companion Pi)</div><div class="cmd-code">sudo tailscale set --accept-routes=true --accept-dns=false</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Sett tidssone (Norge)</div><div class="cmd-code">sudo timedatectl set-timezone Europe/Oslo</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
 
-    <div class="cmd-section">
-      <div class="cmd-section-title">🔄 Oppdatering</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Pi (health, dashboard, watchdog)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Failover-script</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-ts-failover.sh | sudo tee /usr/local/sbin/nep-ts-failover.sh > /dev/null</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Oppdater Stream Deck-patch</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/patch-satellite.py -o /tmp/patch-satellite.py && sudo python3 /tmp/patch-satellite.py</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
+    <h3 class="sec-title">Oppdatering</h3>
+    <div class="cmd-row"><div><div class="cmd-label">Oppdater Pi (health, dashboard, watchdog)</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-update.sh | bash</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Oppdater failover-scriptet</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/nep-ts-failover.sh | sudo tee /usr/local/sbin/nep-ts-failover.sh > /dev/null</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Oppdater Stream Deck-patchen</div><div class="cmd-code">curl -fsSL https://raw.githubusercontent.com/medic02/NEP-CommentaryPi/main/scripts/patch-satellite.py -o /tmp/patch-satellite.py && sudo python3 /tmp/patch-satellite.py</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Oppdater Companion Satellite (husk å kjøre Stream Deck-patchen etterpå)</div><div class="cmd-code">sudo satellite-update stable</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
 
-    <div class="cmd-section">
-      <div class="cmd-section-title">⚙️ Tjenester</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Restart Satellite</div><div class="cmd-code">sudo systemctl restart satellite</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Restart alle NEP-tjenester</div><div class="cmd-code">sudo systemctl restart nep-health && sudo systemctl restart satellite</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Status</div><div class="cmd-code">systemctl status nep-health satellite nep-ts-failover.timer</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Endre Pi-navn</div><div class="cmd-code">sudo nano /etc/systemd/system/nep-health.service
+    <h3 class="sec-title">Tjenester</h3>
+    <div class="cmd-row"><div><div class="cmd-label">Restart Satellite</div><div class="cmd-code">sudo systemctl restart satellite</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Restart alle NEP-tjenester</div><div class="cmd-code">sudo systemctl restart nep-health && sudo systemctl restart satellite</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Status</div><div class="cmd-code">systemctl status nep-health satellite nep-ts-failover.timer</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Endre Pi-navn</div><div class="cmd-code">sudo nano /etc/systemd/system/nep-health.service
 # Endre: Environment="NEP_ID=Satellite Pi X"
-sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
+sudo systemctl daemon-reload && sudo systemctl restart nep-health</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
 
-    <div class="cmd-section">
-      <div class="cmd-section-title">📋 Logging</div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Failover-logg (live)</div><div class="cmd-code">journalctl -t nep-ts-failover -f</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Failover-logg (siste 50)</div><div class="cmd-code">journalctl -t nep-ts-failover -n 50</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-      <div class="cmd-row"><div class="cmd-info"><div class="cmd-label">Satellite-logg</div><div class="cmd-code">journalctl -u satellite -n 50</div></div><button class="cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
-    </div>
+    <h3 class="sec-title">Logger</h3>
+    <div class="cmd-row"><div><div class="cmd-label">Failover-logg (live)</div><div class="cmd-code">journalctl -t nep-ts-failover -f</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Failover-logg (siste 50)</div><div class="cmd-code">journalctl -t nep-ts-failover -n 50</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
+    <div class="cmd-row"><div><div class="cmd-label">Satellite-logg</div><div class="cmd-code">journalctl -u satellite -n 50</div></div><button class="btn-hud cmd-copy" onclick="copyCmd(this)">Kopier</button></div>
 
-    <div class="modal-actions" style="margin-top:20px">
-      <button class="btn" onclick="closeCmds()" style="flex:1;justify-content:center">Lukk</button>
-    </div>
+    <div class="modal-actions"><button class="btn-ghost" onclick="closeCmds()">Lukk</button></div>
   </div>
 </div>
 
-<!-- ── UPDATE MODAL ── -->
-<div class="modal-bg" id="upd-modal" onclick="if(event.target===this)closeUpdate()">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+<!-- UPDATE ALL -->
+<div class="modal-bg" id="upd-modal">
+  <div class="modal" onclick="event.stopPropagation()">
     <h2>Oppdater Pi-er</h2>
-    <div class="upd-list" id="upd-list"></div>
+    <div id="upd-list"></div>
     <div class="modal-actions">
-      <button class="btn btn-cancel" onclick="closeUpdate()">Lukk</button>
-      <button class="btn btn-primary" id="upd-start-btn" onclick="runUpdate()">⬆ Start oppdatering</button>
+      <button class="btn-ghost" onclick="closeUpdate()">Lukk</button>
+      <button class="btn-primary" id="upd-start-btn" onclick="runUpdate()">Start oppdatering</button>
     </div>
   </div>
 </div>
 
-<!-- ── NOTIFICATIONS MODAL ── -->
-<div class="modal-bg" id="notif-modal" onclick="if(event.target===this)closeNotif()">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;max-height:90vh;overflow-y:auto">
-    <h2>🔔 Varslingsinnstillinger</h2>
+<!-- NOTIFICATIONS -->
+<div class="modal-bg" id="notif-modal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>Varsler</h2>
 
-    <div class="notif-section">
-      <div class="notif-section-title">Pushover</div>
-      <div class="field"><label>App Token</label><input id="notif-token" type="text" placeholder="a1b2c3d4e5..."></div>
-      <div class="field" style="margin-bottom:8px"><label>User Key</label><input id="notif-user" type="text" placeholder="u1v2w3x4y5..."></div>
-      <button class="btn" id="notif-test-btn" onclick="testNotif()" style="width:100%;justify-content:center">📨 Send testmelding</button>
-      <div class="notif-test-result" id="notif-test-result"></div>
-    </div>
+    <h3 class="sec-title">Pushover</h3>
+    <label class="field">App token<input id="notif-token" type="text" placeholder="a1b2c3d4e5..." autocomplete="off"></label>
+    <label class="field">User key<input id="notif-user" type="text" placeholder="u1v2w3x4y5..." autocomplete="off"></label>
+    <button class="btn-hud arrow" id="notif-test-btn" onclick="testNotif()" style="margin-left:-.6rem">Send testmelding</button>
+    <div class="result" id="notif-test-result"></div>
 
-    <div class="notif-section">
-      <div class="notif-row"><span class="nr-label" style="font-weight:600;color:var(--text)">Varsler aktivert</span><label class="sw"><input type="checkbox" id="notif-enabled"><span class="sw-track"></span></label></div>
-    </div>
+    <div class="toggle-row strong" style="margin-top:.6rem">Varsler er på<label class="sw"><input type="checkbox" id="notif-enabled"><span class="sw-track"></span></label></div>
 
-    <div class="notif-section">
-      <div class="notif-section-title">Varseltyper</div>
-      <div class="notif-row"><span class="nr-label">🔴 Pi går offline</span><label class="sw"><input type="checkbox" id="a-pi_offline"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">✅ Pi online igjen</span><label class="sw"><input type="checkbox" id="a-pi_online"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">⚠️ Satellite frakoblet</span><label class="sw"><input type="checkbox" id="a-satellite_disconnect"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">✅ Satellite tilkoblet igjen</span><label class="sw"><input type="checkbox" id="a-satellite_reconnect"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">🌡️ Høy temperatur</span><label class="sw"><input type="checkbox" id="a-high_temp"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">⚡ Byttet til Tailscale</span><label class="sw"><input type="checkbox" id="a-failover_to_ts"><span class="sw-track"></span></label></div>
-      <div class="notif-row"><span class="nr-label">✅ Tilbake på LAN</span><label class="sw"><input type="checkbox" id="a-failover_to_lan"><span class="sw-track"></span></label></div>
-    </div>
+    <h3 class="sec-title">Varsle når</h3>
+    <div class="toggle-row">En Pi går offline<label class="sw"><input type="checkbox" id="a-pi_offline"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">En Pi er online igjen<label class="sw"><input type="checkbox" id="a-pi_online"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">Satellite kobler fra<label class="sw"><input type="checkbox" id="a-satellite_disconnect"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">Satellite kobler til igjen<label class="sw"><input type="checkbox" id="a-satellite_reconnect"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">Temperaturen blir høy<label class="sw"><input type="checkbox" id="a-high_temp"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">En Pi bytter til Tailscale<label class="sw"><input type="checkbox" id="a-failover_to_ts"><span class="sw-track"></span></label></div>
+    <div class="toggle-row">En Pi er tilbake på LAN<label class="sw"><input type="checkbox" id="a-failover_to_lan"><span class="sw-track"></span></label></div>
 
-    <div class="notif-section">
-      <div class="notif-section-title">Temperaturgrenser</div>
-      <div class="notif-row"><span class="nr-label">Varsel over</span><div style="display:flex;align-items:center;gap:6px"><input class="notif-num" id="notif-temp-warn" type="number" min="50" max="85"><span style="font-size:.8em;color:var(--muted)">°C</span></div></div>
-      <div class="notif-row"><span class="nr-label">OK under</span><div style="display:flex;align-items:center;gap:6px"><input class="notif-num" id="notif-temp-ok" type="number" min="40" max="80"><span style="font-size:.8em;color:var(--muted)">°C</span></div></div>
-    </div>
+    <h3 class="sec-title">Temperaturgrenser</h3>
+    <div class="toggle-row">Varsle over<span class="num-wrap"><input class="num" id="notif-temp-warn" type="number" min="50" max="85">°C</span></div>
+    <div class="toggle-row">Regnes som OK under<span class="num-wrap"><input class="num" id="notif-temp-ok" type="number" min="40" max="80">°C</span></div>
 
     <div id="notif-devices"></div>
 
     <div class="modal-actions">
-      <button class="btn btn-cancel" onclick="closeNotif()">Avbryt</button>
-      <button class="btn btn-primary" onclick="saveNotif()">Lagre</button>
+      <button class="btn-ghost" onclick="closeNotif()">Avbryt</button>
+      <button class="btn-primary" onclick="saveNotif()">Lagre</button>
     </div>
   </div>
 </div>
 
-<!-- ── PRODUCTION MODAL ── -->
-<div class="modal-bg" id="prod-modal" onclick="if(event.target===this)closeProdModal()">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+<!-- PRODUCTIONS -->
+<div class="modal-bg" id="prod-modal">
+  <div class="modal" onclick="event.stopPropagation()">
     <h2>Produksjoner</h2>
-    <p style="font-size:.82em;color:var(--text2);margin-bottom:16px">Administrer produksjoner – hver produksjon husker sine egne enheter.</p>
-    <div class="prod-modal-list" id="prod-modal-list"></div>
-    <div class="modal-actions" style="margin-top:0">
-      <button class="btn btn-cancel" onclick="closeProdModal()">Lukk</button>
-      <button class="btn btn-primary" onclick="closeProdModal();promptNewProd()">＋ Ny produksjon</button>
+    <p class="hint">Hver produksjon husker sin egen liste med enheter.</p>
+    <div id="prod-modal-list"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeProdModal()">Lukk</button>
+      <button class="btn-primary" onclick="closeProdModal();promptNewProd()">+ Ny produksjon</button>
     </div>
   </div>
 </div>
 
 <script>
-const KEY = 'nep_pis_v2';
-let pis = JSON.parse(localStorage.getItem(KEY) || '[]');
-let live = {};
-let editIdx = -1;
-let currentType = 'pi';
+const KEY='nep_pis_v2';
+let pis=JSON.parse(localStorage.getItem(KEY)||'[]');
+let live={};
+let editIdx=-1;
+let currentType='pi';
+
+function escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJs(s){return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+// ── clock ──
+function tickClock(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  document.getElementById('clock').innerHTML=`${p(d.getHours())}:${p(d.getMinutes())}<small>:${p(d.getSeconds())}</small>`;
+  document.getElementById('date-line').textContent=d.toLocaleDateString('nb-NO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+tickClock();setInterval(tickClock,1000);
+document.getElementById('dash-host').textContent=location.host;
+
+// ── modals: close on backdrop click and Escape ──
+const MODALS=['modal','cmd-modal','upd-modal','notif-modal','prod-modal'];
+MODALS.forEach(id=>document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)e.target.classList.remove('show');}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){MODALS.forEach(id=>document.getElementById(id).classList.remove('show'));closeProdDropdown();}});
+
+// ── device type ──
+const TYPE_LABEL={pi:'Pi',switch:'Switch',router:'Ruter',videohub:'Videohub',device:'Enhet'};
 function setDevType(t){
   currentType=t;
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===t));
   const isPi=t==='pi';
-  document.getElementById('pi-fields').style.display=isPi?'':'none';
-  document.getElementById('device-fields').style.display=isPi?'none':'';
+  document.getElementById('pi-fields').hidden=!isPi;
+  document.getElementById('device-fields').hidden=isPi;
   const names={pi:'Satellite Pi 1',switch:'Switch 1',router:'Ruter 1',videohub:'Videohub 1',device:'Enhet 1'};
   document.getElementById('f-name').placeholder=names[t]||'Enhet 1';
 }
 
-function openCmds(){ document.getElementById('cmd-modal').classList.add('show'); }
-function closeCmds(){ document.getElementById('cmd-modal').classList.remove('show'); }
+// ── commands ──
+function openCmds(){document.getElementById('cmd-modal').classList.add('show');}
+function closeCmds(){document.getElementById('cmd-modal').classList.remove('show');}
 function copyCmd(btn){
   const code=btn.closest('.cmd-row').querySelector('.cmd-code').textContent;
-  const done=()=>{btn.textContent='✓ Kopiert';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Kopier';btn.classList.remove('copied');},2000);};
-  if(navigator.clipboard&&window.isSecureContext){
-    navigator.clipboard.writeText(code).then(done).catch(()=>fallbackCopy(code,done));
-  } else { fallbackCopy(code,done); }
+  const done=()=>{btn.textContent='Kopiert';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Kopier';btn.classList.remove('copied');},2000);};
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(code).then(done).catch(()=>fallbackCopy(code,done));}
+  else fallbackCopy(code,done);
 }
 function fallbackCopy(text,cb){
   const ta=document.createElement('textarea');
@@ -719,145 +551,99 @@ function fallbackCopy(text,cb){
   document.body.removeChild(ta);cb();
 }
 
+// ── config persistence ──
 async function saveToDisk(){
-  localStorage.setItem(KEY, JSON.stringify(pis));
-  try{
-    await fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pis)});
-  }catch{}
+  localStorage.setItem(KEY,JSON.stringify(pis));
+  try{await fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pis)});}catch{}
 }
-
 async function loadConfig(){
   try{
     const r=await fetch('/config',{signal:AbortSignal.timeout(3000)});
     if(!r.ok)return;
     const data=await r.json();
-    if(Array.isArray(data)&&data.length>0){
-      pis=data;
-      localStorage.setItem(KEY,JSON.stringify(pis));
-    } else if(pis.length>0){
-      // Server er tom men vi har lokal data – synk til server
-      saveToDisk();
-    }
+    if(Array.isArray(data)&&data.length>0){pis=data;localStorage.setItem(KEY,JSON.stringify(pis));}
+    else if(pis.length>0){saveToDisk();}
   }catch{}
 }
 
-// ── NOTIFICATIONS ──
+// ── notifications ──
 const ALERT_KEYS=['pi_offline','pi_online','satellite_disconnect','satellite_reconnect','high_temp','failover_to_ts','failover_to_lan'];
-const NOTIF_DEV_ICON={pi:'🖥',switch:'🔀',router:'📡',videohub:'🎬',device:'⚡'};
-
 async function openNotif(){
   document.getElementById('notif-modal').classList.add('show');
-  document.getElementById('notif-test-result').textContent='';
+  const res=document.getElementById('notif-test-result');res.textContent='';res.className='result';
   let deviceAlerts={};
   try{
     const r=await fetch('/notifications-config',{signal:AbortSignal.timeout(3000)});
-    if(!r.ok)return;
-    const c=await r.json();
-    document.getElementById('notif-token').value=c.pushover_token||'';
-    document.getElementById('notif-user').value=c.pushover_user||'';
-    document.getElementById('notif-enabled').checked=c.enabled!==false;
-    ALERT_KEYS.forEach(k=>{
-      const el=document.getElementById('a-'+k);
-      if(el)el.checked=c.alerts?.[k]!==false;
-    });
-    document.getElementById('notif-temp-warn').value=c.temp_warn||75;
-    document.getElementById('notif-temp-ok').value=c.temp_ok||65;
-    deviceAlerts=c.device_alerts||{};
+    if(r.ok){
+      const c=await r.json();
+      document.getElementById('notif-token').value=c.pushover_token||'';
+      document.getElementById('notif-user').value=c.pushover_user||'';
+      document.getElementById('notif-enabled').checked=c.enabled!==false;
+      ALERT_KEYS.forEach(k=>{const el=document.getElementById('a-'+k);if(el)el.checked=c.alerts?.[k]!==false;});
+      document.getElementById('notif-temp-warn').value=c.temp_warn||75;
+      document.getElementById('notif-temp-ok').value=c.temp_ok||65;
+      deviceAlerts=c.device_alerts||{};
+    }
   }catch{}
-
-  // Last enheter og vis per-enhet toggles
+  const wrap=document.getElementById('notif-devices');
   try{
     const dr=await fetch('/config',{signal:AbortSignal.timeout(3000)});
     const devs=dr.ok?await dr.json():[];
-    const wrap=document.getElementById('notif-devices');
-    if(devs.length){
-      wrap.innerHTML=`<div class="notif-section">
-        <div class="notif-section-title">Enheter</div>
-        ${devs.map((p,i)=>{
-          const name=p.name||(p.type||'Enhet');
-          const icon=NOTIF_DEV_ICON[p.type||'pi']||'📡';
-          const checked=deviceAlerts[name]!==false;
-          return `<div class="notif-row">
-            <span class="nr-label">${icon} ${name}</span>
-            <label class="sw"><input type="checkbox" data-devname="${name.replace(/"/g,'&quot;')}" ${checked?'checked':''}><span class="sw-track"></span></label>
-          </div>`;
-        }).join('')}
-      </div>`;
-    } else { wrap.innerHTML=''; }
-  }catch{ document.getElementById('notif-devices').innerHTML=''; }
+    wrap.innerHTML=devs.length?`<h3 class="sec-title">Enheter</h3>`+devs.map(p=>{
+      const name=p.name||TYPE_LABEL[p.type||'pi']||'Enhet';
+      return `<div class="toggle-row">${escHtml(name)}<label class="sw"><input type="checkbox" data-devname="${escHtml(name)}" ${deviceAlerts[name]!==false?'checked':''}><span class="sw-track"></span></label></div>`;
+    }).join(''):'';
+  }catch{wrap.innerHTML='';}
 }
-
 function closeNotif(){document.getElementById('notif-modal').classList.remove('show');}
-
 async function saveNotif(){
   const device_alerts={};
-  document.querySelectorAll('#notif-devices input[data-devname]').forEach(el=>{
-    device_alerts[el.dataset.devname]=el.checked;
-  });
+  document.querySelectorAll('#notif-devices input[data-devname]').forEach(el=>{device_alerts[el.dataset.devname]=el.checked;});
   const cfg={
     pushover_token:document.getElementById('notif-token').value.trim(),
-    pushover_user: document.getElementById('notif-user').value.trim(),
-    enabled:       document.getElementById('notif-enabled').checked,
-    alerts:        Object.fromEntries(ALERT_KEYS.map(k=>[k,document.getElementById('a-'+k)?.checked??true])),
-    temp_warn:     parseInt(document.getElementById('notif-temp-warn').value)||75,
-    temp_ok:       parseInt(document.getElementById('notif-temp-ok').value)||65,
+    pushover_user:document.getElementById('notif-user').value.trim(),
+    enabled:document.getElementById('notif-enabled').checked,
+    alerts:Object.fromEntries(ALERT_KEYS.map(k=>[k,document.getElementById('a-'+k)?.checked??true])),
+    temp_warn:parseInt(document.getElementById('notif-temp-warn').value)||75,
+    temp_ok:parseInt(document.getElementById('notif-temp-ok').value)||65,
     device_alerts,
   };
   try{
     await fetch('/notifications-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
     closeNotif();
-  }catch(e){alert('Feil: '+e.message);}
+  }catch(e){alert('Kunne ikke lagre: '+e.message);}
 }
 async function testNotif(){
   const btn=document.getElementById('notif-test-btn');
   const res=document.getElementById('notif-test-result');
-  btn.disabled=true;btn.textContent='Sender...';res.textContent='';
-  // Lagre først så watchdog bruker siste credentials
+  btn.disabled=true;btn.textContent='Sender';res.textContent='';res.className='result';
   await saveNotif().catch(()=>{});
   document.getElementById('notif-modal').classList.add('show');
   try{
     const r=await fetch('/notifications-test',{method:'POST',signal:AbortSignal.timeout(12000)});
     const d=await r.json();
-    if(d.ok){res.textContent='✅ Sendt!';res.style.color='var(--green)';}
-    else{res.textContent='✗ '+( d.error||'Feil');res.style.color='var(--red)';}
-  }catch(e){res.textContent='✗ '+e.message;res.style.color='var(--red)';}
-  btn.disabled=false;btn.textContent='📨 Send testmelding';
+    if(d.ok){res.textContent='Testmeldingen er sendt.';res.className='result ok';}
+    else{res.textContent=d.error||'Pushover svarte med en feil.';res.className='result err';}
+  }catch(e){res.textContent='Fikk ikke svar: '+e.message;res.className='result err';}
+  btn.disabled=false;btn.textContent='Send testmelding';
 }
 
-// ── MODAL ──
-function openAdd(){ editIdx=-1; clearForm(); document.getElementById('modal-title').textContent='Legg til enhet'; document.getElementById('modal').classList.add('show'); }
+// ── add / edit / delete ──
+function openAdd(){editIdx=-1;clearForm();document.getElementById('modal-title').textContent='Legg til enhet';document.getElementById('modal').classList.add('show');}
 function openEdit(i){
   editIdx=i;
   const p=pis[i];
-  const t=p.type||'pi';
-  currentType=t;
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-lan').value=p.lan||'';
   document.getElementById('f-ts').value=p.ts||'';
-  const fip=document.getElementById('f-ip');
-  if(fip)fip.value=p.ip||'';
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-  const types=['pi','switch','router','videohub','device'];
-  const idx=types.indexOf(t);
-  if(idx>=0)document.querySelectorAll('.type-btn')[idx].classList.add('active');
-  document.getElementById('pi-fields').style.display=t==='pi'?'':'none';
-  document.getElementById('device-fields').style.display=t==='pi'?'none':'';
+  document.getElementById('f-ip').value=p.ip||'';
+  setDevType(p.type||'pi');
   document.getElementById('modal-title').textContent='Rediger enhet';
   document.getElementById('modal').classList.add('show');
 }
-function closeModal(){ document.getElementById('modal').classList.remove('show'); }
-function clearForm(){
-  ['f-name','f-lan','f-ts','f-ip'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  currentType='pi';
-  document.querySelectorAll('.type-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
-  document.getElementById('pi-fields').style.display='';
-  document.getElementById('device-fields').style.display='none';
-}
-function normalizeAddr(v){
-  if(!v)return '';
-  v=v.trim();
-  return v.includes(':')?v:v+':8080';
-}
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+function clearForm(){['f-name','f-lan','f-ts','f-ip'].forEach(id=>{document.getElementById(id).value='';});setDevType('pi');}
+function normalizeAddr(v){if(!v)return '';v=v.trim();return v.includes(':')?v:v+':8080';}
 function savePi(){
   const name=document.getElementById('f-name').value.trim();
   let obj;
@@ -866,120 +652,85 @@ function savePi(){
     const ts=normalizeAddr(document.getElementById('f-ts').value);
     if(!lan&&!ts)return;
     obj={type:'pi',name,lan,ts};
-  } else {
+  }else{
     const ip=(document.getElementById('f-ip').value||'').trim();
     if(!ip)return;
     obj={type:currentType,name,ip};
   }
-  if(editIdx>=0) pis[editIdx]=obj; else pis.push(obj);
-  saveToDisk(); closeModal(); renderManage(); fetchAll();
+  if(editIdx>=0)pis[editIdx]=obj;else pis.push(obj);
+  saveToDisk();closeModal();renderManage();fetchAll();
 }
-function deletePi(i){ pis.splice(i,1); saveToDisk(); renderManage(); render(); }
+function deletePi(i){
+  const p=pis[i];
+  if(!confirm(`Fjerne ${p.name||'denne enheten'} fra dashboardet?`))return;
+  pis.splice(i,1);saveToDisk();renderManage();render();
+}
 function toggleManage(){
   const el=document.getElementById('pi-manage');
   const btn=document.getElementById('manage-btn');
-  const show=el.style.display==='none';
-  el.style.display=show?'block':'none';
-  btn.textContent=show?'Ferdig':'Administrer';
-  if(show)renderManage();
+  el.hidden=!el.hidden;
+  btn.textContent=el.hidden?'Administrer':'Ferdig';
+  btn.classList.toggle('is-on',!el.hidden);
+  if(!el.hidden)renderManage();
 }
 function renderManage(){
-  document.getElementById('pi-rows').innerHTML=pis.map((p,i)=>`
-    <div class="pi-row">
-      <div class="pi-row-info">
-        <span class="pi-row-name">${p.name||'Pi #'+(i+1)}</span>
-        <span class="pi-row-ips">${p.type&&p.type!=='pi'?'IP: '+p.ip:[p.lan&&'LAN: '+p.lan,p.ts&&'TS: '+p.ts].filter(Boolean).join(' · ')}</span>
-      </div>
-      <div class="pi-row-actions">
-        <button class="btn btn-sm" onclick="openEdit(${i})">Rediger</button>
-        <button class="btn btn-sm btn-del" onclick="deletePi(${i})">Slett</button>
-      </div>
-    </div>`).join('');
+  document.getElementById('pi-rows').innerHTML=pis.length?pis.map((p,i)=>{
+    const addr=p.type&&p.type!=='pi'?'IP '+p.ip:[p.lan&&'LAN '+p.lan,p.ts&&'TS '+p.ts].filter(Boolean).join(' · ');
+    return `<div class="manage-row">
+      <div><div class="manage-name">${escHtml(p.name||'Pi #'+(i+1))}</div><div class="manage-addr">${escHtml(TYPE_LABEL[p.type||'pi'])} · ${escHtml(addr)}</div></div>
+      <div class="manage-actions"><button class="btn-hud" onclick="openEdit(${i})">Rediger</button><button class="btn-hud btn-hud-danger" onclick="deletePi(${i})">Fjern</button></div>
+    </div>`;}).join(''):'<div class="empty">Ingen enheter lagt til.</div>';
 }
 
-// ── COLLAPSE (seksjoner + kort) ──
+// ── collapse state (units + reading groups) ──
 const COLLAPSE_KEY='nep_collapsed_v1';
 let collapsed=JSON.parse(localStorage.getItem(COLLAPSE_KEY)||'{}');
-function toggleSection(name,e){
-  e.stopPropagation();
-  collapsed[name]=!collapsed[name];
-  localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));
-  render();
-}
-function toggleCard(key,e){
-  if(e)e.stopPropagation();
-  collapsed[key]=!collapsed[key];
-  localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));
-  render();
-}
+function toggleSection(name,e){e.stopPropagation();collapsed[name]=!collapsed[name];localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));render();}
+function toggleCard(key,e){if(e)e.stopPropagation();collapsed[key]=!collapsed[key];localStorage.setItem(COLLAPSE_KEY,JSON.stringify(collapsed));render();}
 
-// ── ROUTE MODE ──
-async function setRouteMode(idx, mode){
-  const p=pis[idx];
-  const key=JSON.stringify(p);
-  const d=live[key];
-  const addr=d?._via==='ts'?p.ts:p.lan;
+// ── per-Pi actions ──
+function piAddr(p){const d=live[JSON.stringify(p)];return d?._via==='ts'?p.ts:p.lan||p.ts;}
+async function refreshOne(p){
+  const key=JSON.stringify(p),d=live[key],addr=piAddr(p);
+  const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
+  live[key]={...await r.json(),_via:d?._via||'lan'};
+  render();
+}
+async function setRouteMode(idx,mode){
+  const p=pis[idx],addr=piAddr(p);
   if(!addr)return;
   try{
-    await fetch(`http://${addr}/route`,{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'mode='+mode,
-      signal:AbortSignal.timeout(5000)
-    });
-    const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
-    live[key]={...await r.json(),_via:d._via};
-    render();
+    await fetch(`http://${addr}/route`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'mode='+mode,signal:AbortSignal.timeout(5000)});
+    await refreshOne(p);
   }catch(e){console.error(e);}
 }
-
-// ── DIAGNOSE ──
-async function runDiagnose(idx, btn){
-  const p=pis[idx];
-  const key=JSON.stringify(p);
-  const d=live[key];
-  const addr=d?._via==='ts'?p.ts:p.lan||p.ts;
+async function setNepMode(idx,action){
+  const p=pis[idx],addr=piAddr(p);
+  if(!addr)return;
+  try{
+    await fetch(`http://${addr}/mode`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action='+action,signal:AbortSignal.timeout(5000)});
+    await refreshOne(p);
+  }catch(e){console.error(e);}
+}
+async function runDiagnose(idx,btn){
+  const p=pis[idx],addr=piAddr(p),d=live[JSON.stringify(p)];
   if(!addr)return;
   const orig=btn.textContent;
-  btn.textContent='Samler...';btn.disabled=true;
+  const reset=t=>setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},t);
+  btn.textContent='Samler';btn.disabled=true;
   try{
     const res=await fetch(`http://${addr}/diagnose`,{method:'POST',signal:AbortSignal.timeout(35000)});
-    if(!res.ok){btn.textContent='✗ Feil';btn.disabled=false;setTimeout(()=>{btn.textContent=orig;},3000);return;}
+    if(!res.ok){btn.textContent='Feilet';reset(3000);return;}
     const blob=await res.blob();
     const name=(p.name||d?.id||'Pi').replace(/\s+/g,'-');
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download=`nep-diag-${name}.txt`;a.click();
+    const a=document.createElement('a');a.href=url;a.download=`nep-diag-${name}.txt`;a.click();
     URL.revokeObjectURL(url);
-    btn.textContent='✓ Lastet ned';
-    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},3000);
-  }catch(e){
-    btn.textContent='✗ Timeout';btn.disabled=false;
-    setTimeout(()=>{btn.textContent=orig;},3000);
-  }
+    btn.textContent='Lastet ned';reset(3000);
+  }catch{btn.textContent='Tidsavbrudd';reset(3000);}
 }
 
-// ── NEP MODE ──
-async function setNepMode(idx, action){
-  const p=pis[idx];
-  const key=JSON.stringify(p);
-  const d=live[key];
-  const addr=d?._via==='ts'?p.ts:p.lan||p.ts;
-  if(!addr)return;
-  try{
-    await fetch(`http://${addr}/mode`,{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'action='+action,
-      signal:AbortSignal.timeout(5000)
-    });
-    const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(4000)});
-    live[key]={...await r.json(),_via:d._via};
-    render();
-  }catch(e){console.error(e);}
-}
-
-// ── FETCH ──
+// ── polling ──
 async function fetchOne(addr,timeout=4000){
   const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(timeout)});
   if(!r.ok)throw new Error('HTTP '+r.status);
@@ -987,13 +738,8 @@ async function fetchOne(addr,timeout=4000){
 }
 async function fetchPi(p){
   const key=JSON.stringify(p);
-  // Try LAN first (2s), then Tailscale
-  if(p.lan){
-    try{ live[key]={...await fetchOne(p.lan,2000),_via:'lan'}; return; }catch{}
-  }
-  if(p.ts){
-    try{ live[key]={...await fetchOne(p.ts,4000),_via:'ts'}; return; }catch{}
-  }
+  if(p.lan){try{live[key]={...await fetchOne(p.lan,2000),_via:'lan'};return;}catch{}}
+  if(p.ts){try{live[key]={...await fetchOne(p.ts,4000),_via:'ts'};return;}catch{}}
   live[key]=null;
 }
 async function fetchDevice(p){
@@ -1002,239 +748,226 @@ async function fetchDevice(p){
     const r=await fetch(`/ping?host=${encodeURIComponent(p.ip)}`,{signal:AbortSignal.timeout(4000)});
     const d=await r.json();
     live[key]={online:d.online,_type:p.type};
-  }catch{
-    live[key]={online:false,_type:p.type};
-  }
+  }catch{live[key]={online:false,_type:p.type};}
 }
+let polling=false;
 async function fetchAll(){
-  const ring=document.getElementById('refresh-ring');
-  ring.classList.add('spin');
+  if(polling)return;
+  polling=true;
+  const dot=document.getElementById('refresh-ring');
+  dot.classList.add('busy');
   await Promise.all(pis.map(p=>(p.type&&p.type!=='pi')?fetchDevice(p):fetchPi(p)));
   render();
-  ring.classList.remove('spin');
+  dot.classList.remove('busy');
+  document.getElementById('last-poll').textContent=new Date().toLocaleTimeString('nb-NO');
+  polling=false;
 }
 
-// ── RENDER ──
-const DTYPE_ICON={pi:'🖥',switch:'🔀',router:'📡',videohub:'🎬',device:'⚡'};
-const DTYPE_LABEL={pi:'Pi',switch:'Switch',router:'Ruter',videohub:'Videohub',device:'Enhet'};
-function renderDeviceCard(p,d){
-  const online=d?.online||false;
-  const name=p.name||(DTYPE_LABEL[p.type]||'Enhet');
-  const icon=DTYPE_ICON[p.type]||'⚡';
-  const ckey='dcard:'+name;
-  const isCollapsed=collapsed[ckey]||false;
-  return `
-    <div class="dcard ${online?'d-online':'d-offline'} ${isCollapsed?'dcard-collapsed':''}" onclick="toggleCard('${ckey}',event)">
-      <div class="dcard-inner">
-        <div class="dcard-dot ${online?'online':'offline'}"></div>
-        <div class="dcard-icon">${icon}</div>
-        <div class="dcard-info">
-          <div class="dcard-name">${name}</div>
-          <div class="dcard-ip">${p.ip||'–'}</div>
-          <div class="dcard-status ${online?'online':'offline'}">${online?'Online':'Offline'}</div>
-        </div>
-        <span class="collapse-arrow">⌄</span>
-      </div>
-    </div>`;
-}
+// ── render ──
 function uptime(s){
-  if(s<60)return s+'s';
-  if(s<3600)return Math.floor(s/60)+'m';
-  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+  if(s<60)return s+' s';
+  if(s<3600)return Math.floor(s/60)+' min';
+  if(s<86400)return Math.floor(s/3600)+' t '+Math.floor((s%3600)/60)+' min';
+  return Math.floor(s/86400)+' d '+Math.floor((s%86400)/3600)+' t';
 }
-function tempColor(t){ return t==null?'muted':t>70?'red':t>55?'orange':'green'; }
+function piHealth(d){
+  if(!d)return 'critical';
+  if(d.satellite_connected===false)return 'critical';
+  if(d.companion?.using==='tailscale')return 'warn';
+  return 'ok';
+}
+function reading(label,value,cls=''){return `<div class="reading"><span class="r-label">${label}</span><span class="r-value ${cls}">${value}</span></div>`;}
+function group(key,title,body){
+  return `<div class="group ${collapsed[key]?'collapsed':''}"><div class="group-title" onclick="toggleSection('${key}',event)">${title}</div><div class="group-body">${body}</div></div>`;
+}
+
+function renderPi(p,idx){
+  const key=JSON.stringify(p);
+  const d=live[key];
+  const name=p.name||d?.id||'Pi';
+  const ckey='card:'+name;
+  const isCollapsed=collapsed[ckey]||false;
+  const health=piHealth(d);
+  const ckeyJs=escJs(ckey);
+
+  if(!d){
+    return `<article class="unit ${isCollapsed?'collapsed':''}" data-health="critical">
+      <header class="unit-head" onclick="toggleCard('${ckeyJs}',event)">
+        <span class="led"></span>
+        <div style="min-width:0"><div class="unit-name">${escHtml(name)}</div><div class="unit-host">${escHtml(p.lan||p.ts||'–')}</div></div>
+        <span class="unit-state">Offline</span>
+      </header>
+      <div class="unit-body"><div class="unit-offline">Ingen kontakt på LAN eller Tailscale.</div></div>
+    </article>`;
+  }
+
+  const isTs=d.companion?.using==='tailscale';
+  const viaTs=d._via==='ts';
+  const lanIp=(d.ip_addrs||[]).find(a=>a.iface==='eth0')?.ip;
+  const wlanIp=(d.ip_addrs||[]).find(a=>a.iface==='wlan0')?.ip;
+  const tsIp=(d.ip_addrs||[]).find(a=>a.iface?.startsWith('tailscale'))?.ip;
+  const fm=d.force_mode||'auto';
+  const temp=d.cpu_temp_c;
+  const tempPct=temp!=null?Math.min(100,Math.max(0,(temp-30)/50*100)):0;
+  const tempCls=temp==null?'':temp>70?'is-critical':temp>55?'is-warn':'';
+  const sat=d.satellite_connected;
+  const hasMode=d.nep_mode!==undefined;
+  const modeOn=d.nep_mode!=='disabled';
+  const state=sat===false?'Deck frakoblet':isTs?'Tailscale':'LAN';
+  const sshIp=(viaTs?p.ts:p.lan||p.ts||'').split(':')[0];
+
+  const companion=
+    reading('Stream Deck',sat===true?'Tilkoblet':sat===false?'Frakoblet':'–',sat===true?'good':sat===false?'bad':'faint')+
+    reading('Rute',d.companion?.lan_ok?'LAN':isTs?'Tailscale':'–',d.companion?.lan_ok?'good':isTs?'warn':'faint')+
+    reading('Companion',escHtml(d.companion?.ip||'–'));
+  const network=
+    reading('LAN',escHtml(lanIp||'–'),lanIp?'':'faint')+
+    (wlanIp?reading('Wi-Fi',escHtml(wlanIp)):'')+
+    reading('Tailscale',escHtml(tsIp||'–'),tsIp?'info':'faint')+
+    reading('Svarer via',viaTs?'Tailscale':'LAN',viaTs?'warn':'');
+  const failover=
+    reading('Feilteller',String(d.failover?.fail_count||0),d.failover?.fail_count>0?'warn':'faint')+
+    `<div class="route-modes">
+      <button class="route-btn ${fm==='auto'?'is-active':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
+      <button class="route-btn ${fm==='lan'?'is-active':''}" onclick="setRouteMode(${idx},'lan')">LAN</button>
+      <button class="route-btn ts ${fm==='ts'?'is-active':''}" onclick="setRouteMode(${idx},'ts')">Tailscale</button>
+    </div>`;
+  const system=
+    reading('Oppetid',uptime(d.uptime_sec||0),'faint')+
+    (d.version?reading('Versjon',escHtml(d.version),'faint'):'')+
+    reading('Watchdog',d.watchdog?'Aktiv':'Ikke installert',d.watchdog?'good':'bad')+
+    (hasMode?`<div class="reading"><span class="r-label">NEP-modus</span><span class="r-inline"><span class="r-value ${modeOn?'good':'warn'}">${modeOn?'På':'Av'}</span><button class="btn-hud ${modeOn?'btn-hud-warn':''}" onclick="event.stopPropagation();setNepMode(${idx},'${modeOn?'disable':'enable'}')">${modeOn?'Slå av':'Slå på'}</button></span></div>`:'');
+
+  return `<article class="unit ${isCollapsed?'collapsed':''}" data-health="${health}">
+    <header class="unit-head" onclick="toggleCard('${ckeyJs}',event)">
+      <span class="led"></span>
+      <div style="min-width:0"><div class="unit-name">${escHtml(d.id||name)}</div><div class="unit-host">${escHtml(d.hostname||'–')}</div></div>
+      <span class="unit-state">${state}</span>
+    </header>
+    <div class="unit-body">
+      <div class="vital ${tempCls}">
+        <div class="vital-row"><span class="vital-label">CPU-temperatur</span><span class="vital-value">${temp!=null?temp+'°':'–'}</span></div>
+        <div class="vital-bar"><i style="width:${tempPct}%"></i></div>
+      </div>
+      ${group('companion','Companion',companion)}
+      ${group('nettverk','Nettverk',network)}
+      ${group('failover','Failover',failover)}
+      ${group('system','System',system)}
+      ${sshIp?`<div class="unit-actions"><a class="btn-hud arrow" href="ssh://pi@${escHtml(sshIp)}">SSH</a><button class="btn-hud arrow" onclick="runDiagnose(${idx},this)">Diagnose</button></div>`:''}
+    </div>
+  </article>`;
+}
+
+function renderDevice(p){
+  const d=live[JSON.stringify(p)];
+  const online=d?.online||false;
+  const known=d!==undefined;
+  return `<div class="device" data-health="${online||!known?'ok':'critical'}">
+    <span class="led"></span>
+    <div style="min-width:0"><div class="device-name">${escHtml(p.name||TYPE_LABEL[p.type]||'Enhet')}</div><div class="device-type">${escHtml(TYPE_LABEL[p.type]||'Enhet')}</div></div>
+    <span class="device-ip">${escHtml(p.ip||'–')}</span>
+    <span class="device-state">${!known?'–':online?'Online':'Offline'}</span>
+  </div>`;
+}
+
+function stat(label,value,cls,of){
+  return `<div class="stat ${cls}"><div class="stat-label">${label}</div><div class="stat-value">${value}${of!=null?`<small> / ${of}</small>`:''}</div></div>`;
+}
 
 function render(){
   const grid=document.getElementById('grid');
+  const piList=pis.map((p,idx)=>({p,idx})).filter(x=>!x.p.type||x.p.type==='pi');
+  const devList=pis.filter(p=>p.type&&p.type!=='pi');
+
   if(!pis.length){
-    grid.innerHTML=`<div class="empty-state"><span class="icon">📡</span><p>Ingen Pi-er lagt til ennå</p><button class="btn" onclick="openAdd()">＋ Legg til første Pi</button></div>`;
+    grid.innerHTML=`<div class="empty" style="grid-column:1/-1">Ingen enheter er lagt til ennå.<br><button class="btn-hud arrow" onclick="openAdd()">Legg til den første</button></div>`;
     document.getElementById('summary').innerHTML='';
+    document.getElementById('dev-section').hidden=true;
+    document.getElementById('pi-count').textContent='';
+    document.body.dataset.health='idle';
     return;
   }
-  let online=0,tsCount=0;
-  grid.innerHTML=pis.map((p,idx)=>{
-    if(p.type&&p.type!=='pi'){
-      const key=JSON.stringify(p);
-      const d=live[key];
-      if(d?.online)online++;
-      return renderDeviceCard(p,d);
-    }
-    const key=JSON.stringify(p);
-    const d=live[key];
-    const name=p.name||(d?.id)||'Pi';
-    if(!d) return `
-      <div class="card offline">
-        <div class="card-top">
-          <div class="card-id">
-            <div class="status-dot offline"></div>
-            <div>
-              <div class="card-name">${name}</div>
-              <div class="card-host-row"><span class="card-host">${p.lan||p.ts||'–'}</span></div>
-            </div>
-          </div>
-          <span class="conn-badge cb-off">OFFLINE</span>
-        </div>
-        <div class="card-body"><div class="kv"><span class="k">Ingen kontakt</span><span class="v muted">–</span></div></div>
-      </div>`;
-    online++;
-    const using=d.companion?.using||'?';
-    const isTs=using==='tailscale';
-    if(isTs)tsCount++;
-    const viaTs=d._via==='ts';
-    const lanIp=(d.ip_addrs||[]).find(a=>a.iface==='eth0')?.ip||'–';
-    const tsIp=(d.ip_addrs||[]).find(a=>a.iface?.startsWith('tailscale'))?.ip||'–';
-    const fm=d.force_mode||'auto';
-    const temp=d.cpu_temp_c;
-    const tempPct=temp!=null?Math.min(100,Math.max(0,(temp-30)/50*100)):0;
-    const tempCol=temp>70?'#ef4444':temp>55?'#f59e0b':'#00d26a';
-    const satConn=d.satellite_connected;
-    const satDisc=satConn===false;
-    const nepMode=d.nep_mode;
-    const hasModeCtrl=nepMode!==undefined;
-    const modeActive=nepMode!=='disabled';
-    const cardClass=satDisc?'sat-disc':isTs?'ts':'ok';
-    const dotClass=satDisc?'sat-disc':isTs?'ts-mode':'online';
-    const badge=isTs?'<span class="conn-badge cb-ts">TAILSCALE</span>':'<span class="conn-badge cb-lan">LAN</span>';
-    const sshIp=(viaTs?p.ts:p.lan||p.ts||'').split(':')[0];
-    const ckey='card:'+name;
-    const cardCollapsed=collapsed[ckey]||false;
-    return `
-      <div class="card ${cardClass} ${cardCollapsed?'card-collapsed':''}">
-        <div class="card-top" onclick="toggleCard('${ckey}',event)">
-          <div class="card-id">
-            <div class="status-dot ${dotClass}"></div>
-            <div style="min-width:0">
-              <div class="card-name">${d.id||name}</div>
-              <div class="card-host-row">
-                <span class="card-host">${d.hostname||'–'}</span>
-                <span class="via-badge ${viaTs?'via-ts':'via-lan'}">${viaTs?'via TS':'via LAN'}</span>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">${badge}<span class="collapse-arrow">⌄</span></div>
-        </div>
-        <div class="card-body">
-          <div class="section ${collapsed['companion']?'sec-collapsed':''}">
-            <div class="section-label" onclick="toggleSection('companion',event)">Companion</div>
-            <div class="section-body">
-              <div class="kv"><span class="k">Satellite</span><span class="v ${satConn===true?'green':satConn===false?'red':'muted'}">${satConn===true?'✓ Tilkoblet':satConn===false?'✗ Frakoblet':'–'}</span></div>
-              <div class="kv"><span class="k">Rute</span><span class="v ${d.companion?.lan_ok?'green':isTs?'purple':'muted'}">${d.companion?.lan_ok?'LAN':isTs?'Tailscale':'–'}</span></div>
-              <div class="kv"><span class="k">IP</span><span class="v">${d.companion?.ip||'–'}</span></div>
-            </div>
-          </div>
-          <hr class="divider">
-          <div class="section ${collapsed['nettverk']?'sec-collapsed':''}">
-            <div class="section-label" onclick="toggleSection('nettverk',event)">Nettverk</div>
-            <div class="section-body">
-              <div class="kv"><span class="k">LAN</span><span class="v">${lanIp}</span></div>
-              <div class="kv"><span class="k">Tailscale</span><span class="v">${tsIp}</span></div>
-            </div>
-          </div>
-          <hr class="divider">
-          <div class="section ${collapsed['failover']?'sec-collapsed':''}">
-            <div class="section-label" onclick="toggleSection('failover',event)">Failover</div>
-            <div class="section-body">
-              <div class="kv"><span class="k">Feilteller</span><span class="v ${d.failover?.fail_count>0?'orange':''}">${d.failover?.fail_count||0}</span></div>
-              <div class="route-toggle">
-                <button class="rtbtn ${fm==='auto'?'active-auto':''}" onclick="setRouteMode(${idx},'auto')">Auto</button>
-                <button class="rtbtn ${fm==='lan'?'active-lan':''}" onclick="setRouteMode(${idx},'lan')">LAN</button>
-                <button class="rtbtn ${fm==='ts'?'active-ts':''}" onclick="setRouteMode(${idx},'ts')">Tailscale</button>
-              </div>
-            </div>
-          </div>
-          <hr class="divider">
-          <div class="section ${collapsed['system']?'sec-collapsed':''}">
-            <div class="section-label" onclick="toggleSection('system',event)">System</div>
-            <div class="section-body">
-              <div class="kv"><span class="k">CPU-temp</span><span class="v ${tempColor(temp)}">${temp!=null?temp+'°C':'–'}</span></div>
-              ${temp!=null?`<div class="temp-bar" style="width:${tempPct}%;background:${tempCol}"></div>`:''}
-              <div class="kv" style="margin-top:4px"><span class="k">Uptime</span><span class="v muted">${uptime(d.uptime_sec||0)}</span></div>
-              ${d.version?`<div class="kv"><span class="k">Versjon</span><span class="v muted">${d.version}</span></div>`:''}
-              <div class="kv"><span class="k">Watchdog</span><span class="v ${d.watchdog?'green':'red'}">${d.watchdog?'✓ Aktiv':'✗ Ikke installert'}</span></div>
-              ${hasModeCtrl?`<div class="kv" style="margin-top:4px"><span class="k">NEP Modus</span><div style="display:flex;align-items:center;gap:7px"><span class="v ${modeActive?'green':'orange'}">${modeActive?'✓ Aktiv':'✗ Av'}</span><button class="mode-btn" onclick="event.stopPropagation();setNepMode(${idx},'${modeActive?'disable':'enable'}')">${modeActive?'Deaktiver':'Aktiver'}</button></div></div>`:''}
-              ${sshIp ? `<div style="display:flex;gap:6px;margin-top:10px"><a class="ssh-btn" style="margin-top:0;flex:1" href="ssh://pi@${sshIp}">⌨ SSH</a><button class="ssh-btn" style="margin-top:0;flex:1" onclick="runDiagnose(${idx},this)">🔍 Diagnose</button></div>` : ''}
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-  // Summary
-  const total=pis.length;
-  document.getElementById('summary').innerHTML=`
-    <div class="sum-item"><div class="sum-dot" style="background:var(--green)"></div>${online} online</div>
-    ${tsCount?`<div class="sum-item"><div class="sum-dot" style="background:var(--purple)"></div>${tsCount} via TS</div>`:''}
-    ${total-online?`<div class="sum-item"><div class="sum-dot" style="background:var(--red)"></div>${total-online} offline</div>`:''}
-  `;
+
+  grid.innerHTML=piList.length?piList.map(x=>renderPi(x.p,x.idx)).join(''):'<div class="empty" style="grid-column:1/-1">Ingen Pi-er i denne produksjonen.</div>';
+  document.getElementById('pi-count').textContent=piList.length;
+  const devSec=document.getElementById('dev-section');
+  devSec.hidden=!devList.length;
+  document.getElementById('devices').innerHTML=devList.map(renderDevice).join('');
+  document.getElementById('dev-count').textContent=devList.length||'';
+
+  // summary
+  let piOnline=0,onTs=0,deckDown=0,offline=0,devOnline=0,devDown=0;
+  piList.forEach(({p})=>{
+    const d=live[JSON.stringify(p)];
+    if(d===undefined)return;
+    if(!d){offline++;return;}
+    piOnline++;
+    if(d.companion?.using==='tailscale')onTs++;
+    if(d.satellite_connected===false)deckDown++;
+  });
+  devList.forEach(p=>{const d=live[JSON.stringify(p)];if(d?.online)devOnline++;else if(d)devDown++;});
+
+  const anyKnown=Object.keys(live).length>0;
+  let health='idle';
+  if(anyKnown){health=(offline||deckDown||devDown)?'critical':onTs?'warn':'ok';}
+  document.body.dataset.health=health;
+  const words={ok:'Alt OK',warn:'Kjører på reserve',critical:'Trenger tilsyn',idle:'Venter på data'};
+
+  document.getElementById('summary').innerHTML=
+    `<div class="overall" style="grid-column:1/-1"><span class="overall-dot"></span><b>${words[health]}</b></div>`+
+    stat('Pi-er online',piOnline,piOnline===piList.length&&piList.length?'ok':'',piList.length)+
+    stat('Via Tailscale',onTs,onTs?'warn':'zero')+
+    stat('Deck frakoblet',deckDown,deckDown?'critical':'zero')+
+    stat('Pi-er offline',offline,offline?'critical':'zero')+
+    (devList.length?stat('Andre enheter',devOnline,devDown?'critical':'ok',devList.length):'');
 }
 
-// ── UPDATE ALL ──
+// ── update all ──
+function getAddr(p){const d=live[JSON.stringify(p)];if(!d)return p.lan||p.ts||null;return d._via==='ts'?p.ts:p.lan||p.ts||null;}
 function openUpdate(){
   const targets=pis.filter(p=>!p.type||p.type==='pi');
-  if(!targets.length){ alert('Ingen Pi-er konfigurert.'); return; }
+  if(!targets.length){alert('Ingen Pi-er er lagt til.');return;}
   document.getElementById('upd-list').innerHTML=targets.map((p,i)=>{
-    const key=JSON.stringify(p);
-    const d=live[key];
-    const ver=d?.version||'–';
+    const d=live[JSON.stringify(p)];
     const addr=getAddr(p);
-    return `<div class="upd-row" id="upd-row-${i}">
-      <div>
-        <div class="upd-name">${p.name||d?.id||'Pi #'+(i+1)}</div>
-        <div class="upd-ver">v${ver} · ${addr||'ikke tilgjengelig'}</div>
-      </div>
-      <div class="upd-state wait" id="upd-state-${i}">${addr?'Klar':'Offline'}</div>
-    </div>`;
-  }).join('');
-  document.getElementById('upd-start-btn').disabled=false;
-  document.getElementById('upd-start-btn').textContent='⬆ Start oppdatering';
+    return `<div class="list-row">
+      <div><div class="list-name">${escHtml(p.name||d?.id||'Pi #'+(i+1))}</div><div class="list-sub">v${escHtml(d?.version||'–')} · ${escHtml(addr||'ikke tilgjengelig')}</div></div>
+      <span class="upd-state wait" id="upd-state-${i}">${addr?'Klar':'Offline'}</span>
+    </div>`;}).join('');
+  const btn=document.getElementById('upd-start-btn');
+  btn.disabled=false;btn.textContent='Start oppdatering';
   document.getElementById('upd-modal').classList.add('show');
 }
-function closeUpdate(){ document.getElementById('upd-modal').classList.remove('show'); }
-function getAddr(p){
-  const key=JSON.stringify(p);
-  const d=live[key];
-  if(!d)return p.lan||p.ts||null;
-  return d._via==='ts'?p.ts:p.lan||p.ts||null;
-}
+function closeUpdate(){document.getElementById('upd-modal').classList.remove('show');}
 async function runUpdate(){
   const btn=document.getElementById('upd-start-btn');
-  btn.disabled=true; btn.textContent='Oppdaterer...';
+  btn.disabled=true;btn.textContent='Oppdaterer';
   const targets=pis.filter(p=>!p.type||p.type==='pi');
   await Promise.all(targets.map(async(p,i)=>{
-    const setState=(s,cls)=>{
-      const el=document.getElementById(`upd-state-${i}`);
-      if(el){el.textContent=s;el.className='upd-state '+cls;}
-    };
+    const setState=(s,cls)=>{const el=document.getElementById(`upd-state-${i}`);if(el){el.textContent=s;el.className='upd-state '+cls;}};
     const addr=getAddr(p);
-    if(!addr){ setState('Offline','err'); return; }
-    setState('Sender...','doing');
+    if(!addr){setState('Offline','err');return;}
+    setState('Sender','doing');
     try{
       const res=await fetch(`http://${addr}/update`,{method:'POST',signal:AbortSignal.timeout(5000)});
-      if(!res.ok){ setState('✗ Gammel versjon – oppdater manuelt','err'); return; }
+      if(!res.ok){setState('For gammel, oppdater manuelt','err');return;}
       const json=await res.json();
-      if(!json.ok){ setState('✗ Feil fra Pi','err'); return; }
-      setState('Oppdaterer…','doing');
-      // Vent på at tjenesten restartes (~15s), poll til online
+      if(!json.ok){setState('Pi-en svarte med feil','err');return;}
+      setState('Oppdaterer','doing');
       await new Promise(r=>setTimeout(r,5000));
       let ok=false;
       for(let t=0;t<12;t++){
         await new Promise(r=>setTimeout(r,2000));
-        try{
-          const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(3000)});
-          if(r.ok){ ok=true; break; }
-        }catch{}
+        try{const r=await fetch(`http://${addr}/health`,{signal:AbortSignal.timeout(3000)});if(r.ok){ok=true;break;}}catch{}
       }
-      if(ok){ setState('✓ Ferdig','done'); }
-      else   { setState('✗ Timeout','err'); }
-    }catch(e){ setState('✗ Feil','err'); }
+      setState(ok?'Ferdig':'Tidsavbrudd',ok?'done':'err');
+    }catch{setState('Feilet','err');}
   }));
-  btn.textContent='Ferdig'; fetchAll();
+  btn.textContent='Ferdig';fetchAll();
 }
 
-document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
-
-// ── PRODUCTIONS ──
+// ── productions ──
 let prodData={current:null,productions:[]};
-
 async function loadProductions(){
   try{
     const r=await fetch('/productions',{signal:AbortSignal.timeout(3000)});
@@ -1243,43 +976,28 @@ async function loadProductions(){
     renderProdDropdown();
   }catch{}
 }
-
 function renderProdDropdown(){
-  const list=document.getElementById('prod-list');
-  const nameEl=document.getElementById('prod-current-name');
   const current=prodData.productions.find(p=>p.id===prodData.current);
-  nameEl.textContent=current?current.name:'Standard';
-  list.innerHTML=prodData.productions.map(p=>`
-    <div class="prod-item${p.id===prodData.current?' active':''}" onclick="switchProduction('${p.id}')">
-      🎬 ${escHtml(p.name)}
-    </div>`).join('');
+  const name=current?current.name:'Standard';
+  document.getElementById('prod-current-name').textContent=name;
+  document.getElementById('term-prod').textContent=name;
+  document.getElementById('prod-list').innerHTML=prodData.productions.map(p=>
+    `<div class="prod-item${p.id===prodData.current?' active':''}" onclick="switchProduction('${escJs(p.id)}')">${escHtml(p.name)}</div>`).join('');
 }
-
-function toggleProdDropdown(){
-  const btn=document.getElementById('prod-btn');
-  const drop=document.getElementById('prod-dropdown');
-  if(drop.classList.contains('show')){closeProdDropdown();}
-  else{drop.classList.add('show');btn.classList.add('open');}
-}
-
-function closeProdDropdown(){
-  document.getElementById('prod-dropdown').classList.remove('show');
-  document.getElementById('prod-btn').classList.remove('open');
-}
-
+function toggleProdDropdown(){const d=document.getElementById('prod-dropdown');d.classList.contains('show')?closeProdDropdown():d.classList.add('show');}
+function closeProdDropdown(){document.getElementById('prod-dropdown').classList.remove('show');}
 async function switchProduction(id){
   closeProdDropdown();
   try{
     await fetch('/productions/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
-    prodData.current=id;
+    prodData.current=id;live={};
     renderProdDropdown();
     await loadConfig();
     render();fetchAll();
-  }catch(e){alert('Feil: '+e.message);}
+  }catch(e){alert('Kunne ikke bytte produksjon: '+e.message);}
 }
-
 async function promptNewProd(){
-  const name=prompt('Navn på ny produksjon:');
+  const name=prompt('Navn på den nye produksjonen:');
   if(!name||!name.trim())return;
   try{
     const r=await fetch('/productions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),devices:pis})});
@@ -1287,68 +1005,47 @@ async function promptNewProd(){
     const prod=await r.json();
     await switchProduction(prod.id);
     await loadProductions();
-  }catch(e){alert('Feil: '+e.message);}
+  }catch(e){alert('Kunne ikke lage produksjonen: '+e.message);}
 }
-
-function openProdModal(){
-  renderProdModal();
-  document.getElementById('prod-modal').classList.add('show');
-}
-
-function closeProdModal(){
-  document.getElementById('prod-modal').classList.remove('show');
-}
-
+function openProdModal(){renderProdModal();document.getElementById('prod-modal').classList.add('show');}
+function closeProdModal(){document.getElementById('prod-modal').classList.remove('show');}
 function renderProdModal(){
-  const list=document.getElementById('prod-modal-list');
   const multi=prodData.productions.length>1;
-  list.innerHTML=prodData.productions.map(p=>`
-    <div class="prod-row${p.id===prodData.current?' current-row':''}">
-      <span class="prod-row-name">${escHtml(p.name)}</span>
-      ${p.id===prodData.current?'<span class="prod-row-badge">Aktiv</span>':''}
-      <div class="prod-row-btns">
-        ${p.id!==prodData.current?`<button class="prod-row-btn" onclick="switchProdFromModal('${p.id}')">Aktiver</button>`:''}
-        <button class="prod-row-btn" onclick="renameProd('${p.id}')">Gi nytt navn</button>
-        ${multi?`<button class="prod-row-btn danger" onclick="deleteProd('${p.id}')">Slett</button>`:''}
+  document.getElementById('prod-modal-list').innerHTML=prodData.productions.map(p=>{
+    const cur=p.id===prodData.current,id=escJs(p.id);
+    return `<div class="list-row ${cur?'current':''}">
+      <div><div class="list-name">${escHtml(p.name)}</div>${cur?'<div class="badge">Aktiv</div>':''}</div>
+      <div class="row-actions">
+        ${cur?'':`<button class="btn-hud" onclick="switchProdFromModal('${id}')">Bruk</button>`}
+        <button class="btn-hud" onclick="renameProd('${id}')">Gi nytt navn</button>
+        ${multi?`<button class="btn-hud btn-hud-danger" onclick="deleteProd('${id}')">Slett</button>`:''}
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
 }
-
-async function switchProdFromModal(id){
-  closeProdModal();
-  await switchProduction(id);
-}
-
+async function switchProdFromModal(id){closeProdModal();await switchProduction(id);}
 async function renameProd(id){
   const prod=prodData.productions.find(p=>p.id===id);
   const name=prompt('Nytt navn:',prod?.name||'');
   if(!name||!name.trim())return;
   try{
-    await fetch('/productions/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim()})});
-    await loadProductions();
-    renderProdModal();
-  }catch(e){alert('Feil: '+e.message);}
+    await fetch('/productions/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim()})});
+    await loadProductions();renderProdModal();
+  }catch(e){alert('Kunne ikke endre navn: '+e.message);}
 }
-
 async function deleteProd(id){
-  if(!confirm('Slett denne produksjonen?'))return;
+  const prod=prodData.productions.find(p=>p.id===id);
+  if(!confirm(`Slette produksjonen ${prod?.name||''}?`))return;
   try{
-    const r=await fetch('/productions/'+id,{method:'DELETE'});
+    const r=await fetch('/productions/'+encodeURIComponent(id),{method:'DELETE'});
     if(!r.ok)throw new Error(await r.text());
-    await loadProductions();
-    await loadConfig();
+    await loadProductions();await loadConfig();
     render();renderProdModal();
-  }catch(e){alert('Feil: '+e.message);}
+  }catch(e){alert('Kunne ikke slette: '+e.message);}
 }
+document.addEventListener('click',e=>{if(!document.getElementById('prod-wrap').contains(e.target))closeProdDropdown();});
 
-function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-// Close dropdown on outside click
-document.addEventListener('click',e=>{
-  if(!document.getElementById('prod-wrap').contains(e.target))closeProdDropdown();
-});
-
-loadConfig().then(()=>{ render(); if(pis.length)fetchAll(); });
+// ── boot ──
+loadConfig().then(()=>{render();if(pis.length)fetchAll();});
 loadProductions();
 setInterval(fetchAll,5000);
 </script>
