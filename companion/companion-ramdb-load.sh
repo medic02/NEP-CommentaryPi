@@ -27,7 +27,10 @@ DISK_HELPER="$USB_MOUNT/.config/companion-nodejs/v${VER}"
 
 # Kopier arbeidsfiler til RAM
 mkdir -p "$RAM/backups"
-rsync -a --exclude 'backups' "$DISK/" "$RAM/"
+# Never carry -wal/-shm into RAM: the disk copy is a complete snapshot
+# (see companion-ramdb-sync.sh), and a stale WAL would be replayed on top
+# of it when Companion opens the database.
+rsync -a --exclude 'backups' --exclude '*-wal' --exclude '*-shm' --exclude '.*.tmp' "$DISK/" "$RAM/"
 chown -R companion:companion "$RAM"
 
 # Bind RAM over hoved-sti

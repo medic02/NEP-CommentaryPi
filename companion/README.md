@@ -84,3 +84,37 @@ disk uten at noen merket det før neste backup tok flere sekunder igjen.
 forsøk. Verifiser alltid etter en reboot:
 `mount | grep companion-nodejs` — skal vise `tmpfs`. Hvis ikke:
 `sudo systemctl stop companion && sudo /usr/local/sbin/companion-ramdb-load.sh && sudo systemctl start companion`.
+
+## Kjent regresjon: gammel WAL-fil ødela databasen (2026-10-13)
+
+Companion bruker SQLite i WAL-modus. Nye endringer havner først i
+`db.sqlite-wal` og flyttes inn i `db.sqlite` først ved en checkpoint.
+Den gamle synken kopierte bare `db.sqlite` med `rsync`, så kopien på
+USB-disken manglet alt siden siste checkpoint. Den kunne også bli
+halvskrevet hvis kopien tok `db.sqlite` midt i en checkpoint.
+
+Verre var at en gammel `db.sqlite-wal` fra 5. oktober (laget mens
+Companion en periode skrev rett mot USB-disken) ble liggende urørt på
+disken. Ved hver oppstart kopierte `companion-ramdb-load.sh` den inn i
+RAM sammen med databasen, og SQLite spilte inn de gamle sidene over den
+nye databasen. Resultatet var en skadet knapp-rad (`integrity_check`:
+«overflow list length is 1 but should be 67») og
+«Control bank … not found» / «Failed to load control config» i Companion,
+slik at alle Stream Deck-ene ble svarte.
+
+**Fiksen:**
+- `companion-ramdb-sync.sh` tar nå et snapshot med SQLites backup-API
+  (inkluderer WAL-innholdet), skriver det til en midlertidig fil og
+  bytter den inn med `mv`. Disk-kopien er alltid én hel fil uten
+  `-wal`/`-shm` ved siden av.
+- `companion-ramdb-load.sh` tar aldri med `*-wal`, `*-shm` eller
+  midlertidige filer inn i RAM.
+
+**Sjekk databasen** (på en kopi, aldri på den levende filen):
+
+```bash
+sudo cp /run/companion-v50/db.sqlite /tmp/check.sqlite
+python3 -c "import sqlite3;print(sqlite3.connect('/tmp/check.sqlite').execute('pragma integrity_check').fetchone()[0])"
+```
+
+Skal skrive `ok`.
