@@ -180,22 +180,27 @@ echo "  Kiosk satt opp. IKKE restartet automatisk -- gjelder fra neste boot/logi
 echo "  (Konverter-formatet/xrandr-bytte krever at HDMI->SDI-converteren faktisk er tilkoblet.)"
 
 # ── [6/6] Tailscale accept-routes ─────────────────────────────────────────────
-echo "[6/6] Verifiserer Tailscale accept-routes..."
+# Companion Pi sits on 192.168.8.0/24 itself. With accept-routes=true it would
+# route that subnet (advertised by the router) through Tailscale, which broke
+# LAN TCP to :8000/:16622 for every Satellite on 2026-10-06. Only the
+# Satellite Pi-er take accept-routes=true.
+echo "[6/6] Verifiserer Tailscale accept-routes (skal være AV på Companion Pi)..."
 
 if command -v tailscale >/dev/null 2>&1; then
-    sudo tailscale set --accept-routes=true --accept-dns=false || \
-        echo "  ADVARSEL: klarte ikke sette accept-routes -- kjør manuelt: sudo tailscale set --accept-routes=true"
+    sudo tailscale set --accept-routes=false --accept-dns=false || \
+        echo "  ADVARSEL: klarte ikke sette accept-routes -- kjør manuelt: sudo tailscale set --accept-routes=false"
 
     ROUTEALL="$(sudo tailscale debug prefs 2>/dev/null | grep -i '"RouteAll"' | grep -o 'true\|false' || echo "ukjent")"
-    if [ "$ROUTEALL" != "true" ]; then
-        echo "  ADVARSEL: accept-routes er IKKE skrudd på (RouteAll=$ROUTEALL)."
-        echo "  Dette er et kjent hull -- satt feil kan Satellite-failover gå i tomme rør."
-        echo "  Fiks manuelt: sudo tailscale set --accept-routes=true"
+    if [ "$ROUTEALL" != "false" ]; then
+        echo "  ADVARSEL: accept-routes er IKKE av (RouteAll=$ROUTEALL)."
+        echo "  På Companion Pi gjør det at ingen når Companion over LAN."
+        echo "  Fiks manuelt: sudo tailscale set --accept-routes=false"
     else
-        echo "  accept-routes bekreftet PÅ."
+        echo "  accept-routes bekreftet AV."
     fi
 else
-    echo "  Tailscale ikke installert -- hopper over (installer og kjør 'sudo tailscale up' manuelt)."
+    echo "  Tailscale ikke installert -- hopper over (installer og kjør 'sudo tailscale up' manuelt,"
+    echo "  deretter: sudo tailscale set --accept-routes=false)."
 fi
 
 # ── Ferdig ────────────────────────────────────────────────────────────────────

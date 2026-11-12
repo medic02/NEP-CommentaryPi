@@ -118,3 +118,9 @@ python3 -c "import sqlite3;print(sqlite3.connect('/tmp/check.sqlite').execute('p
 ```
 
 Skal skrive `ok`.
+
+## Reparere en skadet database
+
+`companion-db-repair.py` bygger en ny `db.sqlite` av alle radene som fortsatt
+kan leses (brukt 2026-10-30, 2077 knapper reddet). Se toppen av skriptet for
+fremgangsmåte. Kjør alltid på en kopi med Companion stoppet.
